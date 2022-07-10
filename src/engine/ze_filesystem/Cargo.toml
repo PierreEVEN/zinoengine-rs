@@ -1,0 +1,11 @@
+﻿[package]
+name = "ze_filesystem"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ze_core = { version = "0.1.0", path = "../ze_core" }
+parking_lot = "0.12.0"
+notify = "4.0.17"

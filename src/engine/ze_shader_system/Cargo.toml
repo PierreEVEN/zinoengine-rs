@@ -1,0 +1,12 @@
+﻿[package]
+name = "ze_shader_system"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+parking_lot = "0.12.1"
+ze_core = { version = "0.1.0", path = "../ze_core" }
+ze_gfx = { version = "0.1.0", path = "../ze_gfx" }
+ze_jobsystem = { version = "0.1.0", path = "../ze_jobsystem" }
+ze_filesystem = { version = "0.1.0", path = "../ze_filesystem" }
+ze_shader_compiler = { version = "0.1.0", path = "../ze_shader_compiler" }

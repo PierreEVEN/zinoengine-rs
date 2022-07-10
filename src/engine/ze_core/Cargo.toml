@@ -1,0 +1,13 @@
+﻿[package]
+name = "ze_core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+downcast-rs = "1.2.0"
+lazy_static = "1.4.0"
+parking_lot = "0.12.1"
+chrono = "0.4.19"
+termcolor = "1.1.3"
+array-init = "2.0.0"
+bit-vec = "0.6.3"

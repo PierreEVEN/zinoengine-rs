@@ -1,0 +1,93 @@
+﻿shader "Test"
+{
+    vertex   
+    {
+        #include "core.hlsl"
+
+        struct VertexInput
+        {
+            uint vertex_id : SV_VertexID;
+        };
+
+        struct VertexOutput
+        {
+            float4 position : SV_POSITION;
+            float4 color : COLOR;
+            float2 uv : TEXCOORD0;
+        };
+
+        struct Vertex
+        {
+            float2 position;
+            float4 color;
+            float2 uv;
+        };
+        
+        struct TestPushConstants
+        {
+            ResourceHandle vertex_buffer_idx;
+            ResourceHandle vald_texture_idx;
+            ResourceHandle sampler_texture_idx;
+            float time;
+        };
+        
+        ZE_PUSH_CONSTANT TestPushConstants push;
+
+        VertexOutput main(VertexInput input)
+        {   
+            StructuredBuffer<Vertex> vertices = get_structured_buffer<Vertex>(push.vertex_buffer_idx);
+            Vertex vertex = vertices.Load(input.vertex_id);
+
+            VertexOutput output;
+            output.position = float4(vertex.position, 0.0, 1.0);
+            output.color = vertex.color;
+            output.uv = vertex.uv;
+            return output;
+        }
+    }
+    
+    fragment
+    {
+        #include "core.hlsl"
+
+        struct VertexOutput
+        {
+            float4 position : SV_POSITION;
+            float4 color : COLOR;
+            float2 uv : TEXCOORD0;
+        };
+
+        struct TestPushConstants
+        {
+            ResourceHandle vertex_buffer_idx;
+            ResourceHandle vald_texture_idx;
+            ResourceHandle sampler_texture_idx;
+            float time;
+        };
+
+        ZE_PUSH_CONSTANT TestPushConstants push;
+
+        float4 main(VertexOutput input) : SV_TARGET0
+        {
+            Texture2D tex = get_texture(push.vald_texture_idx);
+            SamplerState sampler = get_sampler(push.sampler_texture_idx);
+            //ss
+            float radius = length(input.uv);
+            float angle = atan2(input.uv.y, input.uv.x) / (2.0 * 3.141592653589);
+            
+            // Add the number of full turns we need to reach this radius.
+            angle += floor(radius - angle);
+            
+            input.uv.x += 4.0 * (frac(0.15 * push.time) - angle - 1.0);
+            return tex.Sample(sampler, input.uv);
+            
+           // float2 pixel_pos = input.position.xy;
+           // input.uv.x *= sin(push.time) + (pixel_pos.y / 100.0);
+          //  SamplerState sampler = get_sampler(push.sampler_texture_idx);
+            
+            
+            //return float4(1.0, 0.0, 0.0, 1.0);
+            //return float4(0.2 + sin(push.time), cos(push.time), cos(push.time), 1.0);
+        }
+    }
+}

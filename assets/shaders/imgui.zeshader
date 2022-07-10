@@ -1,0 +1,61 @@
+﻿shader "ImGui"
+{
+	#include "core.hlsl"
+
+	struct Vertex
+	{
+		float2 position;
+		float2 texcoord;
+		uint color;
+	};
+
+	struct VertexOutput
+	{
+		float4 position : SV_POSITION;
+		float2 texcoord : TEXCOORD0;
+		float4 color : TEXCOORD1;
+	};
+
+	struct ShaderData
+    {
+		float4x4 projection_matrix;
+		uint base_vertex_location;
+		ResourceHandle vertex_buffer;
+        ResourceHandle texture;
+        ResourceHandle texture_sampler;
+    };
+
+    ZE_PUSH_CONSTANT ShaderData data;
+
+	vertex
+	{
+        struct VertexInput
+        {
+            uint vertex_id : SV_VertexID;
+        };
+	
+		VertexOutput main(VertexInput input)
+		{
+		    StructuredBuffer<Vertex> vertices = get_structured_buffer<Vertex>(data.vertex_buffer);
+            Vertex vertex = vertices.Load(input.vertex_id + data.base_vertex_location);
+		
+		    VertexOutput output;
+
+			output.position = mul(data.projection_matrix, float4(vertex.position, 0.0, 1.0));
+			output.texcoord = vertex.texcoord;
+			output.color = convert_u32_rgba_color_to_float4(vertex.color);
+
+			return output;
+		}
+	}
+
+	fragment
+	{
+		float4 main(VertexOutput input) : SV_TARGET0
+		{
+			Texture2D texture = get_texture(data.texture);
+			SamplerState sampler = get_sampler(data.texture_sampler);
+			return input.color * texture.Sample(sampler, input.texcoord);
+		}
+	}
+}
