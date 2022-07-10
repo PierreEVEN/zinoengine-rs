@@ -1,0 +1,6 @@
+.idea
+target/
+build/
+*.dll
+*.exe
+*.o
