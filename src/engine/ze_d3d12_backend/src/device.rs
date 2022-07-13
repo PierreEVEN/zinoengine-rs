@@ -44,7 +44,6 @@ unsafe impl Sync for SendableAllocator {}
 pub struct D3D12Device {
     dxgi_factory: Arc<Mutex<SendableIUnknown<IDXGIFactory4>>>,
     device: SendableIUnknown<ID3D12Device>,
-    debug_device: Option<SendableIUnknown<ID3D12DebugDevice>>,
     graphics_queue: SendableIUnknown<ID3D12CommandQueue>,
     compute_queue: SendableIUnknown<ID3D12CommandQueue>,
     transfer_queue: SendableIUnknown<ID3D12CommandQueue>,
@@ -152,7 +151,6 @@ impl D3D12Device {
         Self {
             dxgi_factory,
             device: device.clone(),
-            debug_device,
             allocator: allocator.clone(),
             frame_manager: Arc::new(FrameManager::new(
                 1,

@@ -2,7 +2,7 @@ use enumflags2::{bitflags, BitFlags};
 use raw_window_handle::RawWindowHandle;
 use std::sync::{Arc, Weak};
 use ze_core::downcast_rs::{impl_downcast, Downcast};
-use ze_core::maths::{RectI32, Vec2i32, Vec2u32};
+use ze_core::maths::{RectI32, Vec2i32};
 
 #[bitflags]
 #[repr(u8)]

@@ -126,13 +126,11 @@ impl FileSystem {
     }
 
     fn get_matching_mount_point_for_url(&self, url: &Url) -> Option<usize> {
-        if let Some(host) = url.host() {
-            if let Host::Domain(domain) = host {
-                let mount_points = self.mount_points.read();
-                for (index, mount_point) in mount_points.iter().enumerate() {
-                    if mount_point.get_alias() == domain {
-                        return Some(index);
-                    }
+        if let Some(Host::Domain(domain)) = url.host() {
+            let mount_points = self.mount_points.read();
+            for (index, mount_point) in mount_points.iter().enumerate() {
+                if mount_point.get_alias() == domain {
+                    return Some(index);
                 }
             }
         }
