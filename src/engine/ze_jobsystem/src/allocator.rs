@@ -26,6 +26,7 @@ impl<T> Allocator<T> {
         }
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn allocate(&self, element: T) -> &mut T {
         let elements = self.elements.get_or(|| {
             let length = self.max_elements * mem::size_of::<T>();

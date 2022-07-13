@@ -403,9 +403,9 @@ impl Context {
         }
     }
 
-    pub fn draw_viewport(&mut self, cmd_list: &mut CommandList, viewport: *mut ImGuiViewport) {
+    pub fn draw_viewport(&self, cmd_list: &mut CommandList, viewport: &mut ImGuiViewport) {
         draw_viewport_internal(
-            unsafe { viewport.as_mut() }.unwrap(),
+            viewport,
             &self.device,
             &self.shader_manager,
             &self.font_texture_view,
@@ -472,8 +472,10 @@ impl Context {
     pub fn get_str_buffer(&mut self) -> &mut StrBuffer {
         &mut self.str_buffer
     }
-    pub fn get_main_viewport(&self) -> *mut ImGuiViewport {
-        unsafe { igGetMainViewport() }
+
+    #[allow(clippy::mut_from_ref)]
+    pub fn get_main_viewport(&self) -> &mut ImGuiViewport {
+        unsafe { igGetMainViewport().as_mut().unwrap_unchecked() }
     }
 }
 

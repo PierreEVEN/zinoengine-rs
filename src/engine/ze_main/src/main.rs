@@ -5,7 +5,7 @@ use std::mem::size_of;
 use std::ops::Deref;
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 use std::{env, slice};
 use url::Url;
@@ -275,7 +275,7 @@ fn main() {
                 }
                 Message::WindowResized(event_window, width, height) => {
                     device.wait_idle();
-                    if event_window.as_ptr() != window.as_ref() as *const dyn Window {
+                    if !Weak::ptr_eq(&event_window, &Arc::downgrade(&window)) {
                         break;
                     }
                     //device.begin_frame();
