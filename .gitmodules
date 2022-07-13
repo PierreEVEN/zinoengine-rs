@@ -1,0 +1,4 @@
+[submodule "src/engine/ze_imgui_sys/third-party/cimgui"]
+	path = src/engine/ze_imgui_sys/third-party/cimgui
+	url = https://github.com/cimgui/cimgui.git
+	branch = docking_inter
