@@ -375,8 +375,10 @@ impl Drop for JobSystem {
 
         self.shared_worker_data.sleep_condvar.notify_all();
 
-        for worker in worker_threads {
-            worker.thread.unwrap().join().unwrap();
+        for worker in &worker_threads {
+            while !worker.thread.as_ref().unwrap().is_finished() {
+                self.shared_worker_data.sleep_condvar.notify_all();
+            }
         }
     }
 }
