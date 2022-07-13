@@ -9,3 +9,4 @@ edition = "2021"
 ze_core = { version = "0.1.0", path = "../ze_core" }
 parking_lot = "0.12.0"
 notify = "4.0.17"
+url = "2.2.2"

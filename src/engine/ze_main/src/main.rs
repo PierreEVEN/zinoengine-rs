@@ -4,9 +4,11 @@ use std::borrow::Borrow;
 use std::mem::size_of;
 use std::ops::Deref;
 use std::path::Path;
-use std::slice;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use std::{env, slice};
+use url::Url;
 use ze_core::logger::StdoutSink;
 use ze_core::maths::{RectI32, Vec2, Vec2f32, Vec4f32};
 use ze_core::{logger, thread, ze_info};
@@ -87,11 +89,17 @@ fn main() {
     let jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count());
     let filesystem = FileSystem::new();
     let shader_compiler = D3D12ShaderCompiler::new(filesystem.clone());
-    filesystem.mount(StdMountPoint::new(Path::new("./")));
+    filesystem.mount(StdMountPoint::new(
+        "main",
+        Path::new(&env::current_dir().unwrap()),
+    ));
 
     let shader_system =
         ShaderManager::new(device.clone(), jobsystem.clone(), shader_compiler.clone());
-    shader_system.search_shaders(&filesystem, "assets/shaders".as_ref());
+    shader_system.search_shaders(
+        &filesystem,
+        &Url::from_str("vfs:///assets/shaders").unwrap(),
+    );
 
     let mut swapchain = Arc::new(
         device

@@ -1,14 +1,16 @@
-﻿use crate::{FileSystemError, MountPoint, WatchEvent};
+﻿use crate::{make_url_for_zefs, FileSystemError, MountPoint, WatchEvent};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::fs::{read_dir, File};
 use std::io::{Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use url::Url;
 
 impl From<Error> for FileSystemError {
     fn from(err: Error) -> Self {
@@ -30,6 +32,7 @@ impl From<notify::Error> for FileSystemError {
 }
 
 pub struct StdMountPoint {
+    alias: String,
     root: PathBuf,
     watcher: Mutex<RecommendedWatcher>,
     watcher_closure_map:
@@ -37,7 +40,7 @@ pub struct StdMountPoint {
 }
 
 impl StdMountPoint {
-    pub fn new(root: &Path) -> Box<Self> {
+    pub fn new(alias: &str, root: &Path) -> Box<Self> {
         let (tx, rx) = channel();
         let watcher = Watcher::new(tx, Duration::from_millis(100)).unwrap();
         let watcher_closure_map: Arc<
@@ -59,7 +62,7 @@ impl StdMountPoint {
                                 DebouncedEvent::Write(path) => {
                                     let watcher_closure_map = watcher_closure_map.lock();
                                     if let Some(f) = watcher_closure_map.get(&path) {
-                                        f(WatchEvent::Write(path));
+                                        f(WatchEvent::Write(Url::from_file_path(path).unwrap()));
                                     }
                                 }
                                 _ => {}
@@ -72,38 +75,41 @@ impl StdMountPoint {
         }
 
         Box::new(Self {
+            alias: alias.to_string(),
             root: root.to_path_buf(),
             watcher: Mutex::new(watcher),
             watcher_closure_map,
         })
     }
 
-    fn correct_path(&self, path: &Path) -> PathBuf {
-        if path.is_relative() {
-            let mut correct_path = self.root.clone();
-            correct_path.push(path);
-            return correct_path;
-        }
-
-        path.to_path_buf()
+    fn get_path(&self, path: &Url) -> PathBuf {
+        let path = format!("{}{}", self.root.to_string_lossy(), path.path());
+        PathBuf::from_str(&path).unwrap()
     }
 }
 
 impl MountPoint for StdMountPoint {
-    fn read(&self, path: &Path) -> Result<Box<dyn Read>, FileSystemError> {
-        let file = File::open(self.correct_path(path))?;
+    fn read(&self, path: &Url) -> Result<Box<dyn Read>, FileSystemError> {
+        let file = File::open(self.get_path(path))?;
         Ok(Box::new(file))
     }
 
-    fn iter_dir(&self, path: &Path, f: &dyn Fn(&Path)) -> Result<(), FileSystemError> {
-        let dir = read_dir(self.correct_path(path))?;
+    fn iter_dir(&self, path: &Url, f: &dyn Fn(&Url)) -> Result<(), FileSystemError> {
+        let dir = read_dir(self.get_path(path))?;
 
         for entry in dir {
             let entry = entry?;
+            let mut path = entry.path().clone().to_string_lossy().to_string();
+            let root = self.root.to_string_lossy();
+
+            // Filter out root
+            path.replace_range(0..root.len(), "");
+
+            let path = make_url_for_zefs(self.get_alias(), &path).unwrap();
             if entry.path().is_dir() {
-                self.iter_dir(entry.path().as_path(), f)?;
+                self.iter_dir(&path, f)?;
             } else {
-                f(entry.path().as_path());
+                f(&path);
             }
         }
 
@@ -112,14 +118,18 @@ impl MountPoint for StdMountPoint {
 
     fn watch(
         &self,
-        path: &Path,
+        path: &Url,
         f: &Arc<dyn Fn(WatchEvent) + Send + Sync + 'static>,
     ) -> Result<(), FileSystemError> {
-        let path = self.correct_path(path).canonicalize().unwrap();
+        let path = self.get_path(path).canonicalize().unwrap();
         self.watcher
             .lock()
             .watch(path.clone(), RecursiveMode::NonRecursive)?;
         self.watcher_closure_map.lock().insert(path, f.clone());
         Ok(())
+    }
+
+    fn get_alias(&self) -> &str {
+        &self.alias
     }
 }

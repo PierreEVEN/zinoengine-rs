@@ -355,7 +355,6 @@ impl Parameter {
 
 #[cfg(test)]
 mod tests {
-    use crate::prshd::{Declaration, Parameter, ParameterType, PassType};
     use crate::zeshader::{Declaration, Parameter, ParameterType, PassType};
 
     #[test]

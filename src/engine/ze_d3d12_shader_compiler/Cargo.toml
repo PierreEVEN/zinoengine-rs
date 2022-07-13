@@ -10,3 +10,4 @@ ze_gfx = {path = "../ze_gfx", version = "0.1.0" }
 ze_filesystem = {path = "../ze_filesystem", version = "0.1.0" }
 ze_shader_compiler = {path = "../ze_shader_compiler", version = "0.1.0" }
 hassle-rs = "0.9.0"
+url = "2.2.2"

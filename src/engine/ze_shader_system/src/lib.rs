@@ -6,6 +6,7 @@ use std::hash::Hasher;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use url::Url;
 use ze_core::signals::Signal;
 use ze_core::sparse_array::SparseArray;
 use ze_core::{ze_error, ze_info};
@@ -259,10 +260,11 @@ impl ShaderManager {
         })
     }
 
-    pub fn search_shaders(self: &Arc<ShaderManager>, filesystem: &Arc<FileSystem>, path: &Path) {
+    pub fn search_shaders(self: &Arc<ShaderManager>, filesystem: &Arc<FileSystem>, path: &Url) {
         filesystem
             .iter_dir(path, |entry| {
-                let extension = entry.extension().unwrap_or(OsStr::new(""));
+                let path = Path::new(entry.path());
+                let extension = path.extension().unwrap_or(OsStr::new(""));
                 if extension == "zeshader" {
                     if let Ok(()) = self.load_zeshader_file(filesystem, entry) {
                         // Setup a watch for hot-reloading
@@ -350,7 +352,7 @@ impl ShaderManager {
     }
 
     /// Load a .zeshader shader file into a `Shader`
-    fn load_zeshader_file(&self, filesystem: &Arc<FileSystem>, path: &Path) -> Result<(), ()> {
+    fn load_zeshader_file(&self, filesystem: &Arc<FileSystem>, path: &Url) -> Result<(), ()> {
         match self.parse_zeshader_file(filesystem, path) {
             Ok(declaration) => {
                 let mut shaders = self.shaders.write();
@@ -401,7 +403,7 @@ impl ShaderManager {
                 Ok(())
             }
             Err(err) => {
-                ze_error!("Failed to load shader \"{}\": {}", path.display(), err);
+                ze_error!("Failed to load shader \"{}\": {}", path.as_str(), err);
                 Err(())
             }
         }
@@ -410,7 +412,7 @@ impl ShaderManager {
     fn parse_zeshader_file(
         &self,
         filesystem: &Arc<FileSystem>,
-        path: &Path,
+        path: &Url,
     ) -> Result<zeshader::Declaration, String> {
         match filesystem.read(path) {
             Ok(file) => {

@@ -10,3 +10,4 @@ ze_gfx = { version = "0.1.0", path = "../ze_gfx" }
 ze_jobsystem = { version = "0.1.0", path = "../ze_jobsystem" }
 ze_filesystem = { version = "0.1.0", path = "../ze_filesystem" }
 ze_shader_compiler = { version = "0.1.0", path = "../ze_shader_compiler" }
+url = "2.2.2"

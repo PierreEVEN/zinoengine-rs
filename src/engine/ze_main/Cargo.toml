@@ -10,6 +10,7 @@ name = "ze_main"
 [dependencies]
 lazy_static = "1.4.0"
 image = "0.24.2"
+url = "2.2.2"
 ze_core = { version = "0.1.0", path = "../ze_core" }
 ze_platform = { version = "0.1.0", path = "../ze_platform" }
 ze_windows_platform = { version = "0.1.0", path = "../ze_windows_platform" }
