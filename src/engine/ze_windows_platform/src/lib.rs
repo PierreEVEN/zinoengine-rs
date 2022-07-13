@@ -40,8 +40,15 @@ macro_rules! ze_win_hiword {
 
 const WIN_CLASS_NAME: &str = "ze_window";
 
-#[derive(PartialEq, Eq)]
 struct HashableHWND(HWND);
+
+impl PartialEq for HashableHWND {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for HashableHWND {}
 
 impl Hash for HashableHWND {
     fn hash<H: Hasher>(&self, state: &mut H) {

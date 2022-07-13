@@ -22,7 +22,9 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
-    - uses: Swatinem/rust-cache@v1    
+    - uses: Swatinem/rust-cache@v1 
+    - name: Clippy
+      run: cargo clippy
     - name: Build
       run: cargo build --verbose
     - name: Run tests

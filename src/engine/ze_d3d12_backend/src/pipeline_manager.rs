@@ -6,8 +6,15 @@ use std::mem::transmute;
 use std::ops::Deref;
 use windows::Win32::Graphics::Direct3D12::*;
 
-#[derive(PartialEq, Eq)]
 pub struct GraphicsPipelineEntry(D3D12_GRAPHICS_PIPELINE_STATE_DESC);
+
+impl PartialEq for GraphicsPipelineEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for GraphicsPipelineEntry {}
 
 unsafe impl Send for GraphicsPipelineEntry {}
 unsafe impl Sync for GraphicsPipelineEntry {}
