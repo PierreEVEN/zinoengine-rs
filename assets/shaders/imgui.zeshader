@@ -48,7 +48,7 @@
 			return output;
 		}
 	}
-
+ 
 	fragment
 	{
 		float4 main(VertexOutput input) : SV_TARGET0

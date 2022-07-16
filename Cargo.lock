@@ -1603,6 +1603,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ze_asset_system"
+version = "0.1.0"
+dependencies = [
+ "url",
+ "ze_core",
+ "ze_filesystem",
+]
+
+[[package]]
 name = "ze_core"
 version = "0.1.0"
 dependencies = [
@@ -1619,6 +1628,8 @@ dependencies = [
 name = "ze_d3d12_backend"
 version = "0.1.0"
 dependencies = [
+ "bindgen",
+ "cc",
  "gpu-allocator",
  "parking_lot",
  "raw-window-handle",
@@ -1638,6 +1649,25 @@ dependencies = [
  "ze_filesystem",
  "ze_gfx",
  "ze_shader_compiler",
+]
+
+[[package]]
+name = "ze_editor"
+version = "0.1.0"
+dependencies = [
+ "url",
+ "ze_core",
+ "ze_d3d12_backend",
+ "ze_d3d12_shader_compiler",
+ "ze_filesystem",
+ "ze_gfx",
+ "ze_imgui",
+ "ze_jobsystem",
+ "ze_platform",
+ "ze_render_graph",
+ "ze_shader_compiler",
+ "ze_shader_system",
+ "ze_windows_platform",
 ]
 
 [[package]]
@@ -1719,6 +1749,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ze_render_graph"
+version = "0.1.0"
+dependencies = [
+ "ze_core",
+ "ze_gfx",
+]
+
+[[package]]
 name = "ze_shader_compiler"
 version = "0.1.0"
 dependencies = [
@@ -1738,6 +1776,10 @@ dependencies = [
  "ze_jobsystem",
  "ze_shader_compiler",
 ]
+
+[[package]]
+name = "ze_texture_asset"
+version = "0.1.0"
 
 [[package]]
 name = "ze_windows_platform"

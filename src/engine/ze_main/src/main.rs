@@ -324,7 +324,7 @@ fn main() {
 
         let mut cmd_list = device.create_command_list(QueueType::Graphics).unwrap();
         let mut backbuffer_index = device.get_swapchain_backbuffer_index(&swapchain);
-        imgui.begin(delta_time, platform.get_mouse_position(), &*window);
+        imgui.begin_frame(delta_time, platform.get_mouse_position(), &*window);
         imgui.window("My first window").begin();
         imgui.text("ZIEJFZIOEFJEZIOFJEZIOFJEZOIFJEZOIFJZIOJFEZIOJFZEOIFJ");
         imgui.end();
@@ -332,7 +332,7 @@ fn main() {
         imgui.window("bb je te baise").begin();
         imgui.text("ZIEJFZIOEFJEZIOFJEZIOFJEZOIFJEZOIFJZIOJFEZIOJFZEOIFJ");
         imgui.end();
-        imgui.finish();
+        imgui.end_frame();
 
         push_constant.time += 0.001;
 

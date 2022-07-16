@@ -1,7 +1,7 @@
 pub mod backend;
 pub mod utils;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PixelFormat {
     Unknown,

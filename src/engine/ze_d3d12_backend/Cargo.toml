@@ -2,17 +2,21 @@
 name = "ze_d3d12_backend"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 ze_core = { version = "0.1.0", path = "../ze_core" }
 ze_gfx = { version = "0.1.0", path = "../ze_gfx" }
-parking_lot = "0.12.1"
-
 # windows crate version must be in sync with gpu-allocator's version
 windows = { version = "0.36", features = [ "Win32_Graphics_Direct3D12", "Win32_Graphics_Direct3D", "Win32_Graphics_Dxgi" ] }
 gpu-allocator = { version = "0.18.0", features = [ "d3d12", "windows" ] }
 thread_local = "1.1.4"
 raw-window-handle = "0.4.3"
 tinyvec = { version = "1.6.0", features = [ "alloc" ] }
+parking_lot = "0.12.1"
+
+[build-dependencies]
+cc = "1.0.73"
+bindgen = "0.60.1"

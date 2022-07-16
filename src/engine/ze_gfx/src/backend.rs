@@ -3,7 +3,8 @@ use enumflags2::{bitflags, BitFlags};
 use raw_window_handle::RawWindowHandle;
 use std::any::Any;
 use std::sync::Arc;
-use ze_core::maths::{RectI32, Vec2f32, Vec3i32};
+use ze_core::color::Color4f32;
+use ze_core::maths::{RectI32, Vec2f32, Vec3i32, Vec4f32};
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub enum BackendError {
@@ -365,6 +366,10 @@ pub trait Device: Send + Sync {
         dst_texture: &Texture,
         regions: &[BufferToTextureCopyRegion],
     );
+
+    // Debug functions
+    fn cmd_debug_begin_event(&self, cmd_list: &mut CommandList, name: &str, color: Color4f32);
+    fn cmd_debug_end_event(&self, cmd_list: &mut CommandList);
 
     // Render passes functions
     fn cmd_begin_render_pass(&self, cmd_list: &mut CommandList, desc: &RenderPassDesc);

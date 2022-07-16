@@ -4,18 +4,10 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 use windows::core::Interface;
 use windows::Win32::Graphics::Direct3D::D3D_FEATURE_LEVEL_12_0;
-use windows::Win32::Graphics::Direct3D12::{
-    D3D12CreateDevice, D3D12GetDebugInterface, ID3D12Debug, ID3D12Debug1, ID3D12DebugDevice,
-    ID3D12Device,
-};
-use windows::Win32::Graphics::Dxgi::{
-    CreateDXGIFactory2, DXGIGetDebugInterface1, IDXGIAdapter1, IDXGIFactory4, DXGI_ADAPTER_DESC1,
-    DXGI_ADAPTER_FLAG, DXGI_ADAPTER_FLAG_SOFTWARE, DXGI_CREATE_FACTORY_DEBUG,
-    DXGI_DEBUG_RLO_DETAIL, DXGI_DEBUG_RLO_FLAGS, DXGI_DEBUG_RLO_IGNORE_INTERNAL,
-};
-use windows::Win32::Graphics::Dxgi::{IDXGIDebug1, DXGI_DEBUG_ALL};
+use windows::Win32::Graphics::Direct3D12::*;
+use windows::Win32::Graphics::Dxgi::*;
 use ze_core::ze_info;
-use ze_gfx::backend::{Backend, BackendError, Device};
+use ze_gfx::backend::*;
 
 #[cfg(debug_assertions)]
 const ENABLE_DEBUG_LAYERS: bool = true;

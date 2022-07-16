@@ -1,21 +1,13 @@
 ﻿use crate::descriptor_manager::DescriptorManager;
 use crate::frame_manager::FrameManager;
 use crate::pipeline_manager::PipelineManager;
-use crate::utils::{
-    convert_d3d_error_to_ze_device_error, get_d3d_compare_func_from_ze_compare_op,
-    get_d3d_filter_from_ze_filter, get_d3d_render_pass_beginning_access_type_from_ze_load_mode,
-    get_d3d_render_pass_ending_access_type_from_ze_store_mode,
-    get_d3d_resource_stats_from_ze_resource_state,
-    get_d3d_texture_address_mode_from_ze_texture_address_mode, get_dxgi_format_from_ze_format,
-    get_dxgi_sample_desc_from_ze_sample_desc, get_gpu_allocator_memory_location,
-    get_ze_device_error_from_gpu_allocator_error, get_ze_format_from_dxgi_format,
-    get_ze_sample_desc_from_dxgi_sample_desc, SendableIUnknown,
-};
-use crate::{command_manager, utils};
+use crate::pix::{pix_begin_event_cmd_list, pix_end_event_cmd_list};
+use crate::utils::*;
+use crate::{command_manager, pix, utils};
 use gpu_allocator::d3d12::{Allocation, AllocationCreateDesc, Allocator, AllocatorCreateDesc};
 use parking_lot::Mutex;
 use raw_window_handle::RawWindowHandle;
-use std::ffi::c_void;
+use std::ffi::{c_void, CStr, CString, OsString};
 use std::mem::{size_of, ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -30,8 +22,9 @@ use windows::Win32::Graphics::Dxgi::Common::{
     DXGI_FORMAT_UNKNOWN, DXGI_SAMPLE_DESC,
 };
 use windows::Win32::Graphics::Dxgi::*;
+use ze_core::color::{Color4f32, Color4u8};
 use ze_core::downcast_rs::Downcast;
-use ze_core::maths::RectI32;
+use ze_core::maths::{RectI32, Vec4f32};
 use ze_core::pool::Handle;
 use ze_gfx::backend::*;
 use ze_gfx::ShaderStageFlagBits;
@@ -912,6 +905,45 @@ impl Device for D3D12Device {
                     std::ptr::null(),
                 )
             };
+        }
+    }
+
+    fn cmd_debug_begin_event(&self, cmd_list: &mut CommandList, name: &str, color: Color4f32) {
+        let mut cmd_list = unsafe {
+            cmd_list
+                .backend_data
+                .downcast_mut::<D3D12CommandList>()
+                .unwrap_unchecked()
+        };
+
+        let mut c_name: Vec<u16> = name.encode_utf16().collect();
+        c_name.push(0);
+        let color: Color4u8 = color.into();
+        unsafe {
+            let cmd_list = mem::transmute_copy::<
+                ID3D12GraphicsCommandList4,
+                *mut pix::ID3D12GraphicsCommandList,
+            >(&cmd_list.cmd_list.0);
+
+            pix_begin_event_cmd_list(cmd_list, color.r, color.g, color.b, c_name.as_ptr());
+        }
+    }
+
+    fn cmd_debug_end_event(&self, cmd_list: &mut CommandList) {
+        let mut cmd_list = unsafe {
+            cmd_list
+                .backend_data
+                .downcast_mut::<D3D12CommandList>()
+                .unwrap_unchecked()
+        };
+
+        unsafe {
+            let cmd_list = mem::transmute_copy::<
+                ID3D12GraphicsCommandList4,
+                *mut pix::ID3D12GraphicsCommandList,
+            >(&cmd_list.cmd_list.0);
+
+            pix_end_event_cmd_list(cmd_list);
         }
     }
 

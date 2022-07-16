@@ -269,6 +269,7 @@ impl Context {
                 ImVec4::new(0.80, 0.80, 0.80, 0.35);
         }
 
+        context.update_monitors();
         context
     }
 }
@@ -280,7 +281,7 @@ impl Drop for Context {
 }
 
 impl Context {
-    pub fn begin(
+    pub fn begin_frame(
         &mut self,
         delta_time: f32,
         mouse_position: Vec2i32,
@@ -328,7 +329,7 @@ impl Context {
         }
     }
 
-    pub fn finish(&mut self) {
+    pub fn end_frame(&mut self) {
         unsafe {
             igRender();
             igUpdatePlatformWindows();
