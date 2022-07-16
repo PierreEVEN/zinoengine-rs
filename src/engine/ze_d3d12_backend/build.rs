@@ -21,6 +21,7 @@ fn main() {
     let bindings = bindgen::Builder::default()
         .header(manifest_dir.join("pix-wrapper.hpp").to_string_lossy())
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .layout_tests(false)
         .generate()
         .expect("Failed to generate bindings");
 
