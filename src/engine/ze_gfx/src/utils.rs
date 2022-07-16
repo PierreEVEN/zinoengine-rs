@@ -51,7 +51,7 @@ pub fn copy_data_to_buffer(
             device.cmd_resource_barrier(
                 &mut list,
                 &[ResourceBarrier::Transition(ResourceTransitionBarrier {
-                    resource: ResourceTransitionBarrierResource::Buffer(&buffer),
+                    resource: ResourceTransitionBarrierResource::Buffer(buffer),
                     source_state: ResourceState::CopyWrite,
                     dest_state: dst_resource_state,
                 })],
@@ -59,7 +59,7 @@ pub fn copy_data_to_buffer(
         }
         device.submit(QueueType::Transfer, &[&list], &[], &[]);
     } else {
-        let buffer_data = device.get_buffer_mapped_ptr(&buffer).unwrap();
+        let buffer_data = device.get_buffer_mapped_ptr(buffer).unwrap();
         unsafe {
             ptr::copy_nonoverlapping(data.as_ptr(), buffer_data, data.len());
         }

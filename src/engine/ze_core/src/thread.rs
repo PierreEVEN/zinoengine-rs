@@ -14,8 +14,5 @@ pub fn set_thread_name(id: ThreadId, name: String) {
 }
 
 pub fn get_thread_name(id: ThreadId) -> Option<Arc<String>> {
-    match THREAD_NAME_MAP.read().get(&id) {
-        None => None,
-        Some(str) => Some(str.clone()),
-    }
+    THREAD_NAME_MAP.read().get(&id).cloned()
 }

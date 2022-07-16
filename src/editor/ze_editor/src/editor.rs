@@ -1,9 +1,8 @@
-﻿use std::mem::MaybeUninit;
+﻿use std::env;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 use std::time::Instant;
-use std::{env, mem};
 use url::Url;
 use ze_d3d12_backend::backend::D3D12Backend;
 use ze_d3d12_shader_compiler::D3D12ShaderCompiler;
@@ -132,11 +131,11 @@ impl EditorApplication {
             // Render
 
             let swapchain = self.main_window_swapchain.as_ref().unwrap();
-            let backbuffer_index = self.device.get_swapchain_backbuffer_index(&swapchain);
+            let backbuffer_index = self.device.get_swapchain_backbuffer_index(swapchain);
 
             let backbuffer = self
                 .device
-                .get_swapchain_backbuffer(&swapchain, backbuffer_index)
+                .get_swapchain_backbuffer(swapchain, backbuffer_index)
                 .unwrap();
 
             let mut main_cmd_list = self
@@ -175,7 +174,7 @@ impl EditorApplication {
             self.imgui.draw_non_main_viewports(&mut main_cmd_list);
             self.device
                 .submit(QueueType::Graphics, &[&main_cmd_list], &[], &[]);
-            self.device.present(&swapchain);
+            self.device.present(swapchain);
             self.imgui.present();
 
             self.device.end_frame();

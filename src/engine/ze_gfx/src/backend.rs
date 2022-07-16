@@ -4,7 +4,7 @@ use raw_window_handle::RawWindowHandle;
 use std::any::Any;
 use std::sync::Arc;
 use ze_core::color::Color4f32;
-use ze_core::maths::{RectI32, Vec2f32, Vec3i32, Vec4f32};
+use ze_core::maths::{RectI32, Vec2f32, Vec3i32};
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub enum BackendError {
@@ -456,7 +456,7 @@ pub struct Buffer {
 impl Buffer {
     pub fn new(info: &BufferDesc, backend_data: Box<dyn Any + Send + Sync>) -> Self {
         Self {
-            info: info.clone(),
+            info: *info,
             backend_data,
         }
     }

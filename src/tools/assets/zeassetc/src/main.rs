@@ -1,5 +1,5 @@
-use clap::{arg, Arg, Command};
-use libloading::{Error, Library};
+use clap::{arg, Command};
+use libloading::Library;
 use serde::Deserialize;
 use std::env;
 use std::fs::read_dir;
@@ -15,7 +15,7 @@ struct CompilerInfo {
 
 struct Compiler {
     info: CompilerInfo,
-    lib: libloading::Library,
+    _lib: Library,
     compile_func: unsafe extern "C" fn() -> bool,
 }
 
@@ -42,7 +42,7 @@ fn discover_compilers() -> Vec<Compiler> {
     for path in paths {
         let path = path.unwrap().path();
         if path.extension().is_some() && path.extension().unwrap() == env::consts::DLL_EXTENSION {
-            let lib = unsafe { libloading::Library::new(path.clone()) };
+            let lib = unsafe { Library::new(path.clone()) };
             match lib {
                 Ok(lib) => {
                     if let Ok(get_toml_func) = unsafe {
@@ -54,11 +54,13 @@ fn discover_compilers() -> Vec<Compiler> {
                             let toml = unsafe { get_toml_func() };
                             let compiler_info =
                                 toml::from_str::<CompilerInfo>(unsafe { toml.as_ref() }.unwrap())
-                                    .expect(&format!("dll {} has wrong TOML!", path.display()));
+                                    .unwrap_or_else(|_| {
+                                        panic!("dll {} has wrong TOML!", path.display())
+                                    });
                             let compile_func = *compile_func;
                             compilers.push(Compiler {
                                 info: compiler_info,
-                                lib,
+                                _lib: lib,
                                 compile_func,
                             })
                         }
@@ -100,7 +102,7 @@ fn main() {
         None
     };
 
-    if let Some(_) = matches.subcommand_matches("list-compilers") {
+    if matches.subcommand_matches("list-compilers").is_some() {
         println!("List of available compiler(s):");
         for compiler in &compilers {
             println!(

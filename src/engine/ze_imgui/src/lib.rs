@@ -1,30 +1,17 @@
 use crate::renderer::{SwapChainType, ViewportRendererData};
 use crate::str_buffer::StrBuffer;
 use std::alloc::Layout;
-use std::cmp::max;
 use std::ffi::{CStr, CString};
 use std::mem::{size_of, MaybeUninit};
 use std::os::raw::*;
 use std::sync::Arc;
-use std::{cmp, mem, slice};
+use std::{mem, slice};
 use ze_core::maths::{Matrix4f32, RectI32, Vec2f32, Vec2i32};
-use ze_gfx::backend::{
-    BlendFactor, BlendOp, ClearValue, CommandList, Device, IndexBufferFormat, MemoryLocation,
-    PipelineBlendState, PipelineRenderTargetBlendDesc, RenderPassDesc, RenderPassTexture,
-    RenderPassTextureLoadMode, RenderPassTextureStoreMode, RenderTargetViewDesc,
-    RenderTargetViewType, ResourceBarrier, ResourceState, ResourceTransitionBarrier,
-    ResourceTransitionBarrierResource, Sampler, SamplerDesc, ShaderResourceView,
-    ShaderResourceViewDesc, ShaderResourceViewResource, ShaderResourceViewType, SwapChain,
-    SwapChainDesc, Texture, Texture2DRTV, Texture2DSRV, TextureDesc, TextureUsageFlagBits,
-    TextureUsageFlags, Viewport,
-};
+use ze_gfx::backend::*;
 use ze_gfx::{utils, PixelFormat, SampleDesc};
 use ze_imgui_sys::*;
 use ze_platform::{Message, Platform, Window, WindowFlagBits, WindowFlags};
-use ze_shader_system::{Shader, ShaderManager, ShaderModules};
-
-const BACKEND_PLATFORM_NAME: &str = "ze_platform";
-const BACKEND_RENDERER_NAME: &str = "ze_gfx";
+use ze_shader_system::ShaderManager;
 
 pub struct Context {
     device: Arc<dyn Device>,
@@ -32,7 +19,7 @@ pub struct Context {
     platform: Arc<dyn Platform>,
     str_buffer: StrBuffer,
     context: *mut ImGuiContext,
-    font_texture: Arc<Texture>,
+    _font_texture: Arc<Texture>,
     font_texture_view: ShaderResourceView,
     sampler: Sampler,
 }
@@ -98,7 +85,7 @@ impl Context {
 
         // Build font texture
         let font_texture = unsafe {
-            let mut io = unsafe { igGetIO().as_mut().unwrap_unchecked() };
+            let io = igGetIO().as_mut().unwrap_unchecked();
             let mut pixels = std::ptr::null_mut();
             let mut width = 0;
             let mut height = 0;
@@ -154,7 +141,7 @@ impl Context {
             platform,
             str_buffer: StrBuffer::default(),
             context,
-            font_texture,
+            _font_texture: font_texture,
             sampler,
             font_texture_view,
         });
@@ -174,7 +161,7 @@ impl Context {
             renderer_data.write(ViewportRendererData::default());
         }
 
-        /** Default ZE style */
+        // Default ZE style
         {
             let style = unsafe { igGetStyle().as_mut().unwrap_unchecked() };
             style.WindowRounding = 0.0;
@@ -189,7 +176,7 @@ impl Context {
             style.PopupBorderSize = 1.0;
             style.TabBorderSize = 1.0;
 
-            let mut colors = &mut style.Colors;
+            let colors = &mut style.Colors;
 
             colors[ImGuiCol__ImGuiCol_Text as usize] = ImVec4::new(0.79, 0.79, 0.79, 1.0);
             colors[ImGuiCol__ImGuiCol_TextDisabled as usize] = ImVec4::new(0.50, 0.50, 0.50, 1.0);
@@ -337,7 +324,7 @@ impl Context {
     }
 
     pub fn draw_non_main_viewports(&mut self, cmd_list: &mut CommandList) {
-        let mut io = unsafe { igGetPlatformIO().as_mut().unwrap_unchecked() };
+        let io = unsafe { igGetPlatformIO().as_mut().unwrap_unchecked() };
         let viewports =
             unsafe { slice::from_raw_parts(io.Viewports.Data, io.Viewports.Size as usize) };
 
@@ -353,10 +340,10 @@ impl Context {
                 {
                     let swapchain = unsafe { swapchain.assume_init_ref() };
 
-                    let backbuffer_index = self.device.get_swapchain_backbuffer_index(&swapchain);
+                    let backbuffer_index = self.device.get_swapchain_backbuffer_index(swapchain);
                     let backbuffer = self
                         .device
-                        .get_swapchain_backbuffer(&swapchain, backbuffer_index)
+                        .get_swapchain_backbuffer(swapchain, backbuffer_index)
                         .unwrap();
 
                     self.device.cmd_resource_barrier(
@@ -416,7 +403,7 @@ impl Context {
     }
 
     pub fn present(&mut self) {
-        let mut io = unsafe { igGetPlatformIO().as_mut().unwrap_unchecked() };
+        let io = unsafe { igGetPlatformIO().as_mut().unwrap_unchecked() };
         let viewports =
             unsafe { slice::from_raw_parts(io.Viewports.Data, io.Viewports.Size as usize) };
         for viewport in viewports {
@@ -447,7 +434,7 @@ impl Context {
             unsafe { igMemAlloc((monitor_count * size_of::<ImGuiPlatformMonitor>()) as u64) }
                 as *mut ImGuiPlatformMonitor;
 
-        let mut monitors = unsafe { slice::from_raw_parts_mut(io.Monitors.Data, monitor_count) };
+        let monitors = unsafe { slice::from_raw_parts_mut(io.Monitors.Data, monitor_count) };
         for (index, monitor) in monitors.iter_mut().enumerate() {
             let platform_monitor = self.platform.get_monitor(index);
             monitor.MainPos = ImVec2 {
@@ -521,9 +508,9 @@ fn draw_viewport_internal(
         vertex_buffer: u32,
         texture: u32,
         texture_sampler: u32,
-    };
+    }
 
-    let mut renderer_data =
+    let renderer_data =
         unsafe { (viewport.RendererUserData as *mut ViewportRendererData).as_mut() }.unwrap();
 
     let draw_data = unsafe { viewport.DrawData.as_ref().unwrap_unchecked() };
@@ -572,7 +559,7 @@ fn draw_viewport_internal(
             device.cmd_set_blend_state(cmd_list, &blend_state);
             device.cmd_bind_index_buffer(
                 cmd_list,
-                &renderer_data.index_buffer.as_ref().unwrap(),
+                renderer_data.index_buffer.as_ref().unwrap(),
                 IndexBufferFormat::Uint16,
             );
 
@@ -680,7 +667,7 @@ unsafe extern "C" fn platform_destroy_window(vp: *mut ImGuiViewport) {
     (*vp).PlatformUserData = std::ptr::null_mut();
 }
 
-unsafe extern "C" fn platform_get_window_size(vp: *mut ImGuiViewport, size: *mut ImVec2) {
+unsafe extern "C" fn platform_get_window_size(_: *mut ImGuiViewport, _: *mut ImVec2) {
     todo!()
 }
 
@@ -814,7 +801,7 @@ unsafe extern "C" fn renderer_set_window_size(vp: *mut ImGuiViewport, size: ImVe
         context.device.wait_idle();
         old_rtvs.clear();
 
-        let old_swapchain = unsafe { mem::replace(old_swapchain, MaybeUninit::uninit()) };
+        let old_swapchain = mem::replace(old_swapchain, MaybeUninit::uninit());
 
         let swapchain = context
             .device
@@ -855,11 +842,11 @@ unsafe extern "C" fn renderer_set_window_size(vp: *mut ImGuiViewport, size: ImVe
     }
 }
 
-unsafe extern "C" fn renderer_swap_buffers(vp: *mut ImGuiViewport, userdata: *mut c_void) {
+unsafe extern "C" fn renderer_swap_buffers(_: *mut ImGuiViewport, _: *mut c_void) {
     unimplemented!();
 }
 
-unsafe extern "C" fn renderer_render_window(vp: *mut ImGuiViewport, userdata: *mut c_void) {
+unsafe extern "C" fn renderer_render_window(_: *mut ImGuiViewport, _: *mut c_void) {
     unimplemented!();
 }
 

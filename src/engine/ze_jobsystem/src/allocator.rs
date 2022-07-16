@@ -30,21 +30,16 @@ impl<T> Allocator<T> {
     pub fn allocate(&self, element: T) -> &mut T {
         let elements = self.elements.get_or(|| {
             let length = self.max_elements * mem::size_of::<T>();
-            let mut vec: Vec<u8> = Vec::with_capacity(length);
-            vec.resize(length, 0u8);
-            vec
+            vec![0u8; length]
         });
         let num_allocated_cell = self.num_allocated.get_or_default();
         let num_allocated = num_allocated_cell.get();
         debug_assert!(num_allocated < self.max_elements);
 
-        let index = num_allocated & MAX_JOB_COUNT_PER_THREAD - 1;
+        let index = num_allocated & (MAX_JOB_COUNT_PER_THREAD - 1);
 
         let elem_head = unsafe {
-            let elem_head = elements
-                .as_ptr()
-                .offset((index * mem::size_of::<T>()) as isize)
-                as *mut T;
+            let elem_head = elements.as_ptr().add(index * mem::size_of::<T>()) as *mut T;
             elem_head.write(element);
             elem_head
         };

@@ -257,7 +257,7 @@ impl CommandManager {
     }
 
     pub fn new_frame(&self) {
-        for (_, queue) in &self.queues {
+        for queue in self.queues.values() {
             queue.wait_for_work();
             queue.reset();
         }
@@ -291,7 +291,7 @@ impl CommandManager {
     }
 
     pub fn wait_for_work(&self) {
-        for (_, queue) in &self.queues {
+        for queue in self.queues.values() {
             queue.wait_for_work();
         }
     }

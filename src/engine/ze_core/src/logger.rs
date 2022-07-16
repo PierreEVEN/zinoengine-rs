@@ -52,7 +52,7 @@ pub fn internal_log(severity: Severity, crate_name: &str, args: Arguments) {
         severity,
         crate_name: crate_name.to_string(),
         message: str,
-        time: chrono::Local::now(),
+        time: Local::now(),
         thread: thread::current().id(),
     };
 
@@ -112,13 +112,8 @@ macro_rules! ze_fatal {
 }
 
 /** Default sinks */
+#[derive(Default)]
 pub struct StdoutSink;
-
-impl StdoutSink {
-    pub fn new() -> StdoutSink {
-        StdoutSink {}
-    }
-}
 
 impl Sink for StdoutSink {
     fn log(&self, message: &Message) {

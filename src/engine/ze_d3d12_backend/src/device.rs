@@ -1,13 +1,13 @@
 ﻿use crate::descriptor_manager::DescriptorManager;
 use crate::frame_manager::FrameManager;
 use crate::pipeline_manager::PipelineManager;
+use crate::pix;
 use crate::pix::{pix_begin_event_cmd_list, pix_end_event_cmd_list};
 use crate::utils::*;
-use crate::{command_manager, pix, utils};
 use gpu_allocator::d3d12::{Allocation, AllocationCreateDesc, Allocator, AllocatorCreateDesc};
 use parking_lot::Mutex;
 use raw_window_handle::RawWindowHandle;
-use std::ffi::{c_void, CStr, CString, OsString};
+use std::ffi::c_void;
 use std::mem::{size_of, ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -24,8 +24,7 @@ use windows::Win32::Graphics::Dxgi::Common::{
 use windows::Win32::Graphics::Dxgi::*;
 use ze_core::color::{Color4f32, Color4u8};
 use ze_core::downcast_rs::Downcast;
-use ze_core::maths::{RectI32, Vec4f32};
-use ze_core::pool::Handle;
+use ze_core::maths::RectI32;
 use ze_gfx::backend::*;
 use ze_gfx::ShaderStageFlagBits;
 
@@ -38,8 +37,8 @@ pub struct D3D12Device {
     dxgi_factory: Arc<Mutex<SendableIUnknown<IDXGIFactory4>>>,
     device: SendableIUnknown<ID3D12Device>,
     graphics_queue: SendableIUnknown<ID3D12CommandQueue>,
-    compute_queue: SendableIUnknown<ID3D12CommandQueue>,
-    transfer_queue: SendableIUnknown<ID3D12CommandQueue>,
+    _compute_queue: SendableIUnknown<ID3D12CommandQueue>,
+    _transfer_queue: SendableIUnknown<ID3D12CommandQueue>,
     allocator: Arc<Mutex<SendableAllocator>>,
     frame_manager: Arc<FrameManager>,
     descriptor_manager: Arc<DescriptorManager>,
@@ -52,7 +51,6 @@ impl D3D12Device {
     pub fn new(
         dxgi_factory: Arc<Mutex<SendableIUnknown<IDXGIFactory4>>>,
         device: SendableIUnknown<ID3D12Device>,
-        debug_device: Option<SendableIUnknown<ID3D12DebugDevice>>,
     ) -> Self {
         let graphics_queue: ID3D12CommandQueue = {
             unsafe {
@@ -90,9 +88,9 @@ impl D3D12Device {
         }
         .unwrap();
 
-        utils::set_resource_name(&graphics_queue.clone().into(), "Graphics Queue");
-        utils::set_resource_name(&compute_queue.clone().into(), "Compute Queue");
-        utils::set_resource_name(&transfer_queue.clone().into(), "Transfer Queue");
+        set_resource_name(&graphics_queue.clone().into(), "Graphics Queue");
+        set_resource_name(&compute_queue.clone().into(), "Compute Queue");
+        set_resource_name(&transfer_queue.clone().into(), "Transfer Queue");
 
         let allocator = Arc::new(Mutex::new(SendableAllocator(
             Allocator::new(&AllocatorCreateDesc {
@@ -157,8 +155,8 @@ impl D3D12Device {
             pipeline_manager: PipelineManager::default(),
             default_root_signature: default_root_signature.into(),
             graphics_queue: SendableIUnknown(graphics_queue),
-            compute_queue: SendableIUnknown(compute_queue),
-            transfer_queue: SendableIUnknown(transfer_queue),
+            _compute_queue: SendableIUnknown(compute_queue),
+            _transfer_queue: SendableIUnknown(transfer_queue),
             frame_index: AtomicU64::new(0),
         }
     }
@@ -275,7 +273,7 @@ impl Device for D3D12Device {
 
                         {
                             let resource = resource.clone().into();
-                            utils::set_resource_name(&resource, name);
+                            set_resource_name(&resource, name);
                         }
 
                         Ok(Buffer::new(
@@ -357,7 +355,7 @@ impl Device for D3D12Device {
                         let resource = resource.unwrap();
                         {
                             let resource = resource.clone().into();
-                            utils::set_resource_name(&resource, name);
+                            set_resource_name(&resource, name);
                         }
 
                         Ok(Texture::new(
@@ -377,41 +375,6 @@ impl Device for D3D12Device {
             }
             Err(error) => Err(get_ze_device_error_from_gpu_allocator_error(error)),
         }
-    }
-
-    fn create_sampler(&self, desc: &SamplerDesc) -> Result<Sampler, DeviceError> {
-        let handle = self.descriptor_manager.get_sampler_descriptor_handle();
-        unsafe {
-            self.device.CreateSampler(
-                &D3D12_SAMPLER_DESC {
-                    Filter: get_d3d_filter_from_ze_filter(desc.filter),
-                    AddressU: get_d3d_texture_address_mode_from_ze_texture_address_mode(
-                        desc.address_u,
-                    ),
-                    AddressV: get_d3d_texture_address_mode_from_ze_texture_address_mode(
-                        desc.address_v,
-                    ),
-                    AddressW: get_d3d_texture_address_mode_from_ze_texture_address_mode(
-                        desc.address_w,
-                    ),
-                    MipLODBias: desc.mip_lod_bias,
-                    MaxAnisotropy: desc.max_anisotropy,
-                    ComparisonFunc: get_d3d_compare_func_from_ze_compare_op(desc.compare_op),
-                    BorderColor: [0.0, 0.0, 0.0, 1.0],
-                    MinLOD: desc.min_lod,
-                    MaxLOD: desc.max_lod,
-                },
-                handle.0,
-            );
-        }
-
-        Ok(Sampler::new(
-            desc.clone(),
-            Box::new(D3D12Sampler {
-                descriptor_manager: self.descriptor_manager.clone(),
-                handle,
-            }),
-        ))
     }
 
     fn create_shader_resource_view(
@@ -477,7 +440,7 @@ impl Device for D3D12Device {
             desc.clone(),
             Box::new(D3D12ShaderResourceView {
                 descriptor_manager: self.descriptor_manager.clone(),
-                handle: handle,
+                handle,
             }),
         ))
     }
@@ -522,7 +485,7 @@ impl Device for D3D12Device {
             desc.clone(),
             Box::new(D3D12RenderTargetView {
                 descriptor_manager: self.descriptor_manager.clone(),
-                handle: handle,
+                handle,
             }),
         ))
     }
@@ -578,10 +541,7 @@ impl Device for D3D12Device {
                     memory_location: MemoryLocation::GpuOnly,
                 };
 
-                utils::set_resource_name(
-                    &buffer.clone().into(),
-                    &format!("Swapchain Texture {}", i),
-                );
+                set_resource_name(&buffer.clone().into(), &format!("Swapchain Texture {}", i));
 
                 let texture = Texture::new(
                     desc,
@@ -596,84 +556,81 @@ impl Device for D3D12Device {
 
             Ok(SwapChain::new(
                 *info,
-                Box::new(D3D12SwapChain::new(swapchain.0.clone().into(), textures)),
+                Box::new(D3D12SwapChain::new(swapchain.0.into(), textures)),
             ))
-        } else {
-            if let RawWindowHandle::Win32(hwnd) = info.window_handle {
-                let desc = DXGI_SWAP_CHAIN_DESC1 {
-                    Width: info.width,
-                    Height: info.height,
-                    Format: get_dxgi_format_from_ze_format(info.format),
-                    Stereo: BOOL::from(false),
-                    SampleDesc: get_dxgi_sample_desc_from_ze_sample_desc(info.sample_desc),
-                    BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
-                    BufferCount: swapchain_buffer_count as u32,
-                    Scaling: DXGI_SCALING_STRETCH,
-                    SwapEffect: DXGI_SWAP_EFFECT_FLIP_DISCARD,
-                    AlphaMode: DXGI_ALPHA_MODE_UNSPECIFIED,
-                    Flags: 0,
-                };
+        } else if let RawWindowHandle::Win32(hwnd) = info.window_handle {
+            let desc = DXGI_SWAP_CHAIN_DESC1 {
+                Width: info.width,
+                Height: info.height,
+                Format: get_dxgi_format_from_ze_format(info.format),
+                Stereo: BOOL::from(false),
+                SampleDesc: get_dxgi_sample_desc_from_ze_sample_desc(info.sample_desc),
+                BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
+                BufferCount: swapchain_buffer_count as u32,
+                Scaling: DXGI_SCALING_STRETCH,
+                SwapEffect: DXGI_SWAP_EFFECT_FLIP_DISCARD,
+                AlphaMode: DXGI_ALPHA_MODE_UNSPECIFIED,
+                Flags: 0,
+            };
 
-                let factory = self.dxgi_factory.lock();
-                let swapchain = unsafe {
-                    factory.CreateSwapChainForHwnd(
-                        self.graphics_queue.deref(),
-                        HWND(hwnd.hwnd as isize),
-                        &desc,
-                        std::ptr::null(),
-                        None,
-                    )
-                };
+            let factory = self.dxgi_factory.lock();
+            let swapchain = unsafe {
+                factory.CreateSwapChainForHwnd(
+                    self.graphics_queue.deref(),
+                    HWND(hwnd.hwnd as isize),
+                    &desc,
+                    std::ptr::null(),
+                    None,
+                )
+            };
 
-                match swapchain {
-                    Ok(swapchain) => {
-                        let swapchain: IDXGISwapChain3 =
-                            swapchain.cast::<IDXGISwapChain3>().unwrap();
+            match swapchain {
+                Ok(swapchain) => {
+                    let swapchain: IDXGISwapChain3 = swapchain.cast::<IDXGISwapChain3>().unwrap();
 
-                        let mut textures = Vec::with_capacity(swapchain_buffer_count);
-                        for i in 0..swapchain_buffer_count {
-                            let buffer: ID3D12Resource =
-                                unsafe { swapchain.GetBuffer::<ID3D12Resource>(i as u32) }.unwrap();
-                            let d3d_desc: D3D12_RESOURCE_DESC = unsafe { buffer.GetDesc() };
+                    let mut textures = Vec::with_capacity(swapchain_buffer_count);
+                    for i in 0..swapchain_buffer_count {
+                        let buffer: ID3D12Resource =
+                            unsafe { swapchain.GetBuffer::<ID3D12Resource>(i as u32) }.unwrap();
+                        let d3d_desc: D3D12_RESOURCE_DESC = unsafe { buffer.GetDesc() };
 
-                            let desc = TextureDesc {
-                                width: d3d_desc.Width as u32,
-                                height: d3d_desc.Height as u32,
-                                depth: d3d_desc.DepthOrArraySize as u32,
-                                mip_levels: d3d_desc.MipLevels as u32,
-                                format: get_ze_format_from_dxgi_format(d3d_desc.Format),
-                                sample_desc: get_ze_sample_desc_from_dxgi_sample_desc(
-                                    d3d_desc.SampleDesc,
-                                ),
-                                usage_flags: info.usage_flags,
-                                memory_location: MemoryLocation::GpuOnly,
-                            };
+                        let desc = TextureDesc {
+                            width: d3d_desc.Width as u32,
+                            height: d3d_desc.Height as u32,
+                            depth: d3d_desc.DepthOrArraySize as u32,
+                            mip_levels: d3d_desc.MipLevels as u32,
+                            format: get_ze_format_from_dxgi_format(d3d_desc.Format),
+                            sample_desc: get_ze_sample_desc_from_dxgi_sample_desc(
+                                d3d_desc.SampleDesc,
+                            ),
+                            usage_flags: info.usage_flags,
+                            memory_location: MemoryLocation::GpuOnly,
+                        };
 
-                            utils::set_resource_name(
-                                &buffer.clone().into(),
-                                &format!("Swapchain Texture {}", i),
-                            );
+                        set_resource_name(
+                            &buffer.clone().into(),
+                            &format!("Swapchain Texture {}", i),
+                        );
 
-                            let texture = Texture::new(
-                                desc,
-                                Box::new(D3D12Texture::new(
-                                    self.frame_manager.clone(),
-                                    buffer.into(),
-                                    None,
-                                )),
-                            );
-                            textures.push(Arc::new(texture));
-                        }
-                        Ok(SwapChain::new(
-                            *info,
-                            Box::new(D3D12SwapChain::new(swapchain.into(), textures)),
-                        ))
+                        let texture = Texture::new(
+                            desc,
+                            Box::new(D3D12Texture::new(
+                                self.frame_manager.clone(),
+                                buffer.into(),
+                                None,
+                            )),
+                        );
+                        textures.push(Arc::new(texture));
                     }
-                    Err(err) => Err(convert_d3d_error_to_ze_device_error(err)),
+                    Ok(SwapChain::new(
+                        *info,
+                        Box::new(D3D12SwapChain::new(swapchain.into(), textures)),
+                    ))
                 }
-            } else {
-                Err(DeviceError::Unknown)
+                Err(err) => Err(convert_d3d_error_to_ze_device_error(err)),
             }
+        } else {
+            Err(DeviceError::Unknown)
         }
     }
 
@@ -684,13 +641,13 @@ impl Device for D3D12Device {
     }
 
     fn create_command_list(&self, queue_type: QueueType) -> Result<CommandList, DeviceError> {
-        let (handle, cmd_list) = self
+        let (_, cmd_list) = self
             .frame_manager
             .get_current_frame()
             .get_command_manager()
             .create_command_list(self, queue_type);
 
-        let cmd_list = D3D12CommandList::new(handle, cmd_list.into());
+        let cmd_list = D3D12CommandList::new(cmd_list);
 
         if queue_type != QueueType::Transfer {
             unsafe {
@@ -712,6 +669,41 @@ impl Device for D3D12Device {
         }
 
         Ok(CommandList::new(Box::new(cmd_list)))
+    }
+
+    fn create_sampler(&self, desc: &SamplerDesc) -> Result<Sampler, DeviceError> {
+        let handle = self.descriptor_manager.get_sampler_descriptor_handle();
+        unsafe {
+            self.device.CreateSampler(
+                &D3D12_SAMPLER_DESC {
+                    Filter: get_d3d_filter_from_ze_filter(desc.filter),
+                    AddressU: get_d3d_texture_address_mode_from_ze_texture_address_mode(
+                        desc.address_u,
+                    ),
+                    AddressV: get_d3d_texture_address_mode_from_ze_texture_address_mode(
+                        desc.address_v,
+                    ),
+                    AddressW: get_d3d_texture_address_mode_from_ze_texture_address_mode(
+                        desc.address_w,
+                    ),
+                    MipLODBias: desc.mip_lod_bias,
+                    MaxAnisotropy: desc.max_anisotropy,
+                    ComparisonFunc: get_d3d_compare_func_from_ze_compare_op(desc.compare_op),
+                    BorderColor: [0.0, 0.0, 0.0, 1.0],
+                    MinLOD: desc.min_lod,
+                    MaxLOD: desc.max_lod,
+                },
+                handle.0,
+            );
+        }
+
+        Ok(Sampler::new(
+            desc.clone(),
+            Box::new(D3D12Sampler {
+                descriptor_manager: self.descriptor_manager.clone(),
+                handle,
+            }),
+        ))
     }
 
     fn get_buffer_mapped_ptr(&self, buffer: &Buffer) -> Option<*mut u8> {
@@ -798,6 +790,23 @@ impl Device for D3D12Device {
         };
 
         Ok(swapchain.textures[index as usize].clone())
+    }
+
+    fn present(&self, swapchain: &SwapChain) {
+        let swapchain = unsafe {
+            swapchain
+                .backend_data
+                .downcast_ref::<D3D12SwapChain>()
+                .unwrap_unchecked()
+        };
+        unsafe {
+            let mut flags = 0;
+            if swapchain.need_restart.load(Ordering::SeqCst) {
+                flags |= DXGI_PRESENT_RESTART;
+                swapchain.need_restart.store(false, Ordering::SeqCst);
+            }
+            swapchain.swapchain.Present(0, flags).unwrap();
+        }
     }
 
     fn cmd_copy_buffer_regions(
@@ -909,10 +918,10 @@ impl Device for D3D12Device {
     }
 
     fn cmd_debug_begin_event(&self, cmd_list: &mut CommandList, name: &str, color: Color4f32) {
-        let mut cmd_list = unsafe {
+        let cmd_list = unsafe {
             cmd_list
                 .backend_data
-                .downcast_mut::<D3D12CommandList>()
+                .downcast_ref::<D3D12CommandList>()
                 .unwrap_unchecked()
         };
 
@@ -930,10 +939,10 @@ impl Device for D3D12Device {
     }
 
     fn cmd_debug_end_event(&self, cmd_list: &mut CommandList) {
-        let mut cmd_list = unsafe {
+        let cmd_list = unsafe {
             cmd_list
                 .backend_data
-                .downcast_mut::<D3D12CommandList>()
+                .downcast_ref::<D3D12CommandList>()
                 .unwrap_unchecked()
         };
 
@@ -1400,23 +1409,6 @@ impl Device for D3D12Device {
             .submit(queue_type, command_lists, wait_fences, signal_fences);
     }
 
-    fn present(&self, swapchain: &SwapChain) {
-        let swapchain = unsafe {
-            swapchain
-                .backend_data
-                .downcast_ref::<D3D12SwapChain>()
-                .unwrap_unchecked()
-        };
-        unsafe {
-            let mut flags = 0;
-            if swapchain.need_restart.load(Ordering::SeqCst) {
-                flags |= DXGI_PRESENT_RESTART;
-                swapchain.need_restart.store(false, Ordering::SeqCst);
-            }
-            swapchain.swapchain.Present(0, flags).unwrap();
-        }
-    }
-
     fn wait_idle(&self) {
         self.frame_manager.wait_for_work();
     }
@@ -1568,6 +1560,7 @@ impl D3D12SwapChain {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum D3D12CommandListPipelineType {
     Graphics(D3D12_GRAPHICS_PIPELINE_STATE_DESC),
     Compute(D3D12_COMPUTE_PIPELINE_STATE_DESC),
@@ -1576,7 +1569,6 @@ enum D3D12CommandListPipelineType {
 unsafe impl Send for D3D12CommandListPipelineType {}
 
 pub struct D3D12CommandList {
-    handle: Handle<command_manager::CommandList>,
     cmd_list: SendableIUnknown<ID3D12GraphicsCommandList4>,
     pipeline: D3D12CommandListPipelineType,
     render_pass_rt_count: u32,
@@ -1586,10 +1578,7 @@ pub struct D3D12CommandList {
 }
 
 impl D3D12CommandList {
-    pub fn new(
-        handle: Handle<command_manager::CommandList>,
-        cmd_list: SendableIUnknown<ID3D12GraphicsCommandList4>,
-    ) -> Self {
+    pub fn new(cmd_list: SendableIUnknown<ID3D12GraphicsCommandList4>) -> Self {
         let default_blend_desc = D3D12_RENDER_TARGET_BLEND_DESC {
             BlendEnable: Default::default(),
             LogicOpEnable: Default::default(),
@@ -1604,7 +1593,6 @@ impl D3D12CommandList {
         };
 
         Self {
-            handle,
             cmd_list,
             pipeline: D3D12CommandListPipelineType::Graphics(D3D12_GRAPHICS_PIPELINE_STATE_DESC {
                 pRootSignature: None,

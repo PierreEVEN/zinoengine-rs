@@ -14,11 +14,11 @@ use ze_filesystem::{FileSystem, WatchEvent};
 use ze_gfx::backend::{Device, PipelineShaderStage, ShaderModule};
 use ze_gfx::ShaderStageFlagBits;
 use ze_jobsystem::JobSystem;
-use ze_shader_compiler::{ShaderCompiler, ShaderCompilerInput, ShaderCompilerOutput};
+use ze_shader_compiler::{ShaderCompiler, ShaderCompilerInput};
 
 enum ShaderStageSourceData {
     Bytecode(Vec<u8>),
-    HLSL(String),
+    Hlsl(String),
 }
 
 pub struct ShaderStage {
@@ -53,19 +53,11 @@ pub struct Shader {
     ty: ShaderType,
     name: String,
     passes: Vec<ShaderPass>,
-
-    /// Signal called when this shader is invalidated (e.g hot reload)
-    on_invalidated: Signal<()>,
 }
 
 impl Shader {
     fn new(ty: ShaderType, name: String, passes: Vec<ShaderPass>) -> Self {
-        Self {
-            ty,
-            name,
-            passes,
-            on_invalidated: Default::default(),
-        }
+        Self { ty, name, passes }
     }
 
     fn get_pass_index(&self, name: &str) -> Option<usize> {
@@ -99,6 +91,7 @@ impl ShaderModules {
 }
 
 /// Simple cache storing the shader modules in a Arc
+#[derive(Default)]
 struct ShaderModulesCache {
     shaders: RwLock<HashMap<u64, Arc<ShaderModules>>>,
 }
@@ -106,19 +99,7 @@ struct ShaderModulesCache {
 impl ShaderModulesCache {
     fn get(&self, id: u64) -> Option<Arc<ShaderModules>> {
         let shaders = self.shaders.read();
-        if let Some(modules) = shaders.get(&id) {
-            Some(modules.clone())
-        } else {
-            None
-        }
-    }
-}
-
-impl Default for ShaderModulesCache {
-    fn default() -> Self {
-        Self {
-            shaders: Default::default(),
-        }
+        shaders.get(&id).cloned()
     }
 }
 
@@ -159,26 +140,22 @@ impl CompilationManager {
 
     fn is_compiling(&self, id: u64) -> Option<Arc<CompilingShader>> {
         let shaders = self.shaders.lock();
-        if let Some(shader) = shaders.get(&id) {
-            Some(shader.clone())
-        } else {
-            None
-        }
+        shaders.get(&id).cloned()
     }
 
     fn compile_permutation(
         &self,
         key: u64,
-        name: &String,
+        name: &str,
         pass: &ShaderPass,
         callback: impl FnMut(Arc<CompilingShader>) + Clone + Send + Sync + 'static,
     ) -> Arc<CompilingShader> {
         let mut shaders = self.shaders.lock();
-        let shader = Arc::new(CompilingShader::new(name.clone(), pass.stages.len()));
+        let shader = Arc::new(CompilingShader::new(name.to_string(), pass.stages.len()));
         shaders.insert(key, shader.clone());
 
         for stage in &pass.stages {
-            if let ShaderStageSourceData::HLSL(code) = &stage.source_data {
+            if let ShaderStageSourceData::Hlsl(code) = &stage.source_data {
                 let shader = shader.clone();
                 let shaders = self.shaders.clone();
                 let code = code.clone();
@@ -237,7 +214,6 @@ pub enum GetModulesError {
 
 pub struct ShaderManager {
     device: Arc<dyn Device>,
-    jobsystem: Arc<JobSystem>,
     shaders: RwLock<SparseArray<Shader>>,
     shader_name_to_index_map: RwLock<HashMap<String, usize>>,
     module_cache: Arc<ShaderModulesCache>,
@@ -252,7 +228,6 @@ impl ShaderManager {
     ) -> Arc<Self> {
         Arc::new(Self {
             device,
-            jobsystem: jobsystem.clone(),
             shaders: RwLock::new(SparseArray::default()),
             shader_name_to_index_map: Default::default(),
             module_cache: Arc::new(ShaderModulesCache::default()),
@@ -264,7 +239,7 @@ impl ShaderManager {
         filesystem
             .iter_dir(path, |entry| {
                 let path = Path::new(entry.path());
-                let extension = path.extension().unwrap_or(OsStr::new(""));
+                let extension = path.extension().unwrap_or_else(|| OsStr::new(""));
                 if extension == "zeshader" {
                     if let Ok(()) = self.load_zeshader_file(filesystem, entry) {
                         // Setup a watch for hot-reloading
@@ -289,19 +264,19 @@ impl ShaderManager {
 
     /// Get the modules of the specified shader
     /// If not available yet (compiling) it will returns a signal to know when the shader is ready
-    pub fn get_shader_modules<'a>(
+    pub fn get_shader_modules(
         self: &Arc<ShaderManager>,
         name: &String,
         pass: Option<String>,
     ) -> Result<Arc<ShaderModules>, GetModulesError> {
         let shader_name_to_index_map = self.shader_name_to_index_map.read();
         if let Some(shader_index) = shader_name_to_index_map.get(name) {
-            let shader_index = shader_index.clone();
+            let shader_index = *shader_index;
             drop(shader_name_to_index_map); // Drop now so we don't deadlock the IO Watcher Thread and us
             let shader = &self.shaders.read()[shader_index];
             let pass = match &pass {
                 None => "",
-                Some(name) => &name,
+                Some(name) => name,
             };
 
             if let Some(pass_idx) = shader.get_pass_index(pass) {
@@ -382,7 +357,7 @@ impl ShaderManager {
                             declaration.common_hlsl.clone() + &pass.common_hlsl + &stage.hlsl;
                         stages.push(ShaderStage::new(
                             stage.stage,
-                            ShaderStageSourceData::HLSL(hlsl),
+                            ShaderStageSourceData::Hlsl(hlsl),
                         ));
                     }
                     passes.push(ShaderPass::new(pass.name, stages));

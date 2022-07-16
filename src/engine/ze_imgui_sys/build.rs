@@ -1,6 +1,6 @@
 ﻿use cmake::Config;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 fn main() -> io::Result<()> {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));

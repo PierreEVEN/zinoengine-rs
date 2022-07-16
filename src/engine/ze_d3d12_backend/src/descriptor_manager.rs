@@ -39,7 +39,7 @@ impl DescriptorHeap {
             handle
         } else {
             let mut tail_handle = self.tail_handles.lock();
-            let handle = tail_handle.clone();
+            let handle = *tail_handle;
             tail_handle.0.ptr += self.increment_size as usize;
             tail_handle.1 += 1;
             handle

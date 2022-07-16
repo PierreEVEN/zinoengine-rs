@@ -1,5 +1,6 @@
 use enumflags2::{bitflags, BitFlags};
 use raw_window_handle::RawWindowHandle;
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::{Arc, Weak};
 use ze_core::downcast_rs::{impl_downcast, Downcast};
 use ze_core::maths::{RectI32, Vec2i32};
@@ -69,6 +70,19 @@ pub struct Monitor {
     pub dpi: f32,
 }
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum Error {
+    Unknown,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for Error {}
+
 /// Trait describing a platform, supporting window creation, event handling etc
 pub trait Platform: Send + Sync {
     fn poll_event(&self) -> Option<Message>;
@@ -80,7 +94,7 @@ pub trait Platform: Send + Sync {
         x: i32,
         y: i32,
         flags: WindowFlags,
-    ) -> Result<Arc<dyn Window>, ()>;
+    ) -> Result<Arc<dyn Window>, Error>;
 
     fn create_system_cursor(&self, cursor: SystemCursor) -> Box<dyn Cursor>;
     fn get_mouse_position(&self) -> Vec2i32;

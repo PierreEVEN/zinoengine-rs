@@ -6,9 +6,16 @@ mod descriptor_manager;
 pub mod device;
 mod frame_manager;
 mod pipeline_manager;
-mod pix;
 mod resource_manager;
 pub mod utils;
+
+mod pix {
+    #![allow(non_upper_case_globals)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_snake_case)]
+    #![allow(unused)]
+    include!("./pix.rs");
+}
 
 #[macro_export]
 macro_rules! ze_d3d12_agility_sdk_statics {

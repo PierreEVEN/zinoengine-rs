@@ -24,7 +24,7 @@ impl D3D12Backend {
         // Create a debug controller if debug is enabled
         let debug_controller: Option<ID3D12Debug1> = unsafe {
             let mut debug: Option<ID3D12Debug> = None;
-            if let Ok(_) = D3D12GetDebugInterface(&mut debug) {
+            if D3D12GetDebugInterface(&mut debug).is_ok() {
                 let debug = debug.unwrap();
                 let controller: windows::core::Result<ID3D12Debug1> = debug.cast();
                 match controller {
@@ -89,16 +89,10 @@ impl Backend for D3D12Backend {
 
         unsafe {
             // Search for a compatible adapter
-
             let mut adapter_index = 0;
             let mut adapter_to_use = None;
 
-            loop {
-                let adapter: IDXGIAdapter1 = match factory.EnumAdapters1(adapter_index) {
-                    Ok(adapter) => adapter,
-                    Err(_) => break,
-                };
-
+            while let Ok(adapter) = factory.EnumAdapters1(adapter_index) {
                 let desc: DXGI_ADAPTER_DESC1 = adapter.GetDesc1().unwrap();
                 if DXGI_ADAPTER_FLAG(desc.Flags) & DXGI_ADAPTER_FLAG_SOFTWARE
                     == DXGI_ADAPTER_FLAG_SOFTWARE
@@ -117,27 +111,11 @@ impl Backend for D3D12Backend {
             // Try create a device with this adapter
             if let Some(adapter) = adapter_to_use {
                 let mut device: Option<ID3D12Device> = None;
-                if let Ok(_) = D3D12CreateDevice(&adapter, D3D_FEATURE_LEVEL_12_0, &mut device) {
+                if D3D12CreateDevice(&adapter, D3D_FEATURE_LEVEL_12_0, &mut device).is_ok() {
                     let device = device.unwrap();
-                    // Try also obtaining the debug device
-                    let debug_device = {
-                        if ENABLE_DEBUG_LAYERS {
-                            let debug_device: windows::core::Result<ID3D12DebugDevice> =
-                                device.cast();
-
-                            match debug_device {
-                                Ok(debug_device) => Some(debug_device.into()),
-                                Err(_) => None,
-                            }
-                        } else {
-                            None
-                        }
-                    };
-
                     Ok(Arc::new(D3D12Device::new(
                         self.factory.clone(),
                         device.into(),
-                        debug_device,
                     )))
                 } else {
                     Err(BackendError::Unsupported)

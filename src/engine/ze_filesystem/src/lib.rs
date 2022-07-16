@@ -26,6 +26,7 @@ impl Display for FileSystemError {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum WatchEvent {
     Write(Url),
 }

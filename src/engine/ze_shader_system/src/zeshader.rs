@@ -103,11 +103,11 @@ impl Declaration {
     pub fn from_string(content: String) -> Result<Self, String> {
         #[derive(PartialEq)]
         enum Block {
-            HLSL,
-            SHADER,
-            STAGE,
-            PASS,
-            PARAMETERS,
+            Hlsl,
+            Shader,
+            Stage,
+            Pass,
+            Parameters,
         }
 
         let mut declaration = Declaration {
@@ -159,7 +159,7 @@ impl Declaration {
 
                 // Parameter parsing
                 // Treat "word" as the name of the parameter
-                if !blocks.is_empty() && *blocks.last().unwrap() == Block::PARAMETERS {
+                if !blocks.is_empty() && *blocks.last().unwrap() == Block::Parameters {
                     if !skip_until(&mut iter, ':') {
                         return Err("Can't find type for parameter.".to_string());
                     }
@@ -188,146 +188,143 @@ impl Declaration {
                         ParameterType::from_str(&ty).unwrap(),
                         word.clone(),
                     ));
-                } else {
-                    if word == "shader" {
-                        if !skip_until(&mut iter, '"') {
-                            return Err("Can't properly parse shader name. Excepted syntax: 'shader \"Name\"'".to_string());
-                        }
-
-                        loop {
-                            char = iter.next().unwrap();
-                            match char
-							{
-								'"' => break,
-								'\n' => return Err("Can't properly parse shader name. Excepted syntax: 'shader \"Name\"".to_string()),
-								_ => declaration.name.push(char)
-							}
-                        }
-
-                        if !skip_until(&mut iter, '{') {
-                            return Err("Shader block neved opened.".to_string());
-                        }
-
-                        blocks.push(Block::SHADER);
-                    } else if word == "vertex" && !is_in_stage {
-                        if !skip_until(&mut iter, '{') {
-                            return Err("Vertex block never opened.".to_string());
-                        }
-
-                        if declaration.passes[current_pass_index].ty == PassType::Compute {
-                            return Err("Cannot add a vertex block to a compute pass.".to_string());
-                        }
-
-                        blocks.push(Block::STAGE);
-                        declaration.passes[current_pass_index]
-                            .stages
-                            .push(Stage::new(ShaderStageFlagBits::Vertex));
-                        current_hlsl_stage = &mut declaration.passes[current_pass_index]
-                            .stages
-                            .last_mut()
-                            .unwrap()
-                            .hlsl;
-                        is_in_stage = true;
-                    } else if word == "fragment" && !is_in_stage {
-                        if !skip_until(&mut iter, '{') {
-                            return Err("Fragment block never opened.".to_string());
-                        }
-
-                        if declaration.passes[current_pass_index].ty == PassType::Compute {
-                            return Err(
-                                "Cannot add a fragment block to a compute pass.".to_string()
-                            );
-                        }
-
-                        blocks.push(Block::STAGE);
-                        declaration.passes[current_pass_index]
-                            .stages
-                            .push(Stage::new(ShaderStageFlagBits::Fragment));
-                        current_hlsl_stage = &mut declaration.passes[current_pass_index]
-                            .stages
-                            .last_mut()
-                            .unwrap()
-                            .hlsl;
-                        is_in_stage = true;
-                    } else if word == "compute" && !is_in_stage {
-                        if !skip_until(&mut iter, '{') {
-                            return Err("Compute block never opened.".to_string());
-                        }
-
-                        if !declaration.passes[current_pass_index].stages.is_empty() {
-                            return Err(
-                                "Compute block already detected or pass is a graphical one."
-                                    .to_string(),
-                            );
-                        }
-
-                        blocks.push(Block::STAGE);
-                        declaration.passes[current_pass_index]
-                            .stages
-                            .push(Stage::new(ShaderStageFlagBits::Compute));
-                        declaration.passes[current_pass_index].ty = PassType::Compute;
-                        current_hlsl_stage = &mut declaration.passes[current_pass_index]
-                            .stages
-                            .last_mut()
-                            .unwrap()
-                            .hlsl;
-                        is_in_stage = true;
-                    } else if word == "pass" {
-                        if !skip_until(&mut iter, '"') {
-                            return Err("Invalid pass syntax. 'pass \"Name\"'".to_string());
-                        }
-
-                        declaration.passes.push(Pass::new());
-                        current_pass_index = declaration.passes.len() - 1;
-
-                        loop {
-                            let char = match iter.next() {
-                                None => break,
-                                Some(ch) => ch,
-                            };
-
-                            match char {
-                                '"' => break,
-                                '\n' => {
-                                    return Err("Can't properly parse pass name. 'pass \"Name\"'"
-                                        .to_string())
-                                }
-                                _ => declaration.passes[current_pass_index].name.push(char),
-                            }
-                        }
-
-                        current_hlsl_stage =
-                            &mut declaration.passes[current_pass_index].common_hlsl;
-
-                        if !skip_until(&mut iter, '{') {
-                            return Err("Pass block never opened.".to_string());
-                        }
-
-                        blocks.push(Block::PASS);
-                    } else if word == "parameters" {
-                        if !skip_until(&mut iter, '{') {
-                            return Err("Parameters block never opened.".to_string());
-                        }
-
-                        blocks.push(Block::PARAMETERS);
-                    } else {
-                        current_hlsl_stage.push_str(&word);
-                        current_hlsl_stage.push(char);
+                } else if word == "shader" {
+                    if !skip_until(&mut iter, '"') {
+                        return Err(
+                            "Can't properly parse shader name. Excepted syntax: 'shader \"Name\"'"
+                                .to_string(),
+                        );
                     }
+
+                    loop {
+                        char = iter.next().unwrap();
+                        match char
+                        {
+                            '"' => break,
+                            '\n' => return Err("Can't properly parse shader name. Excepted syntax: 'shader \"Name\"".to_string()),
+                            _ => declaration.name.push(char)
+                        }
+                    }
+
+                    if !skip_until(&mut iter, '{') {
+                        return Err("Shader block neved opened.".to_string());
+                    }
+
+                    blocks.push(Block::Shader);
+                } else if word == "vertex" && !is_in_stage {
+                    if !skip_until(&mut iter, '{') {
+                        return Err("Vertex block never opened.".to_string());
+                    }
+
+                    if declaration.passes[current_pass_index].ty == PassType::Compute {
+                        return Err("Cannot add a vertex block to a compute pass.".to_string());
+                    }
+
+                    blocks.push(Block::Stage);
+                    declaration.passes[current_pass_index]
+                        .stages
+                        .push(Stage::new(ShaderStageFlagBits::Vertex));
+                    current_hlsl_stage = &mut declaration.passes[current_pass_index]
+                        .stages
+                        .last_mut()
+                        .unwrap()
+                        .hlsl;
+                    is_in_stage = true;
+                } else if word == "fragment" && !is_in_stage {
+                    if !skip_until(&mut iter, '{') {
+                        return Err("Fragment block never opened.".to_string());
+                    }
+
+                    if declaration.passes[current_pass_index].ty == PassType::Compute {
+                        return Err("Cannot add a fragment block to a compute pass.".to_string());
+                    }
+
+                    blocks.push(Block::Stage);
+                    declaration.passes[current_pass_index]
+                        .stages
+                        .push(Stage::new(ShaderStageFlagBits::Fragment));
+                    current_hlsl_stage = &mut declaration.passes[current_pass_index]
+                        .stages
+                        .last_mut()
+                        .unwrap()
+                        .hlsl;
+                    is_in_stage = true;
+                } else if word == "compute" && !is_in_stage {
+                    if !skip_until(&mut iter, '{') {
+                        return Err("Compute block never opened.".to_string());
+                    }
+
+                    if !declaration.passes[current_pass_index].stages.is_empty() {
+                        return Err("Compute block already detected or pass is a graphical one."
+                            .to_string());
+                    }
+
+                    blocks.push(Block::Stage);
+                    declaration.passes[current_pass_index]
+                        .stages
+                        .push(Stage::new(ShaderStageFlagBits::Compute));
+                    declaration.passes[current_pass_index].ty = PassType::Compute;
+                    current_hlsl_stage = &mut declaration.passes[current_pass_index]
+                        .stages
+                        .last_mut()
+                        .unwrap()
+                        .hlsl;
+                    is_in_stage = true;
+                } else if word == "pass" {
+                    if !skip_until(&mut iter, '"') {
+                        return Err("Invalid pass syntax. 'pass \"Name\"'".to_string());
+                    }
+
+                    declaration.passes.push(Pass::new());
+                    current_pass_index = declaration.passes.len() - 1;
+
+                    loop {
+                        let char = match iter.next() {
+                            None => break,
+                            Some(ch) => ch,
+                        };
+
+                        match char {
+                            '"' => break,
+                            '\n' => {
+                                return Err(
+                                    "Can't properly parse pass name. 'pass \"Name\"'".to_string()
+                                )
+                            }
+                            _ => declaration.passes[current_pass_index].name.push(char),
+                        }
+                    }
+
+                    current_hlsl_stage = &mut declaration.passes[current_pass_index].common_hlsl;
+
+                    if !skip_until(&mut iter, '{') {
+                        return Err("Pass block never opened.".to_string());
+                    }
+
+                    blocks.push(Block::Pass);
+                } else if word == "parameters" {
+                    if !skip_until(&mut iter, '{') {
+                        return Err("Parameters block never opened.".to_string());
+                    }
+
+                    blocks.push(Block::Parameters);
+                } else {
+                    current_hlsl_stage.push_str(&word);
+                    current_hlsl_stage.push(char);
                 }
             } else if char == '{' {
-                blocks.push(Block::HLSL);
+                blocks.push(Block::Hlsl);
                 current_hlsl_stage.push(char);
             } else if char == '}' {
                 let block = blocks.pop().unwrap();
 
-                if block == Block::PASS {
+                if block == Block::Pass {
                     current_hlsl_stage = &mut declaration.common_hlsl;
                     current_pass_index = 0;
-                } else if block == Block::STAGE {
+                } else if block == Block::Stage {
                     current_hlsl_stage = &mut declaration.passes.last_mut().unwrap().common_hlsl;
                     is_in_stage = false;
-                } else if block != Block::PARAMETERS && block != Block::SHADER {
+                } else if block != Block::Parameters && block != Block::Shader {
                     current_hlsl_stage.push(char);
                 }
             } else {
@@ -346,10 +343,7 @@ impl Parameter {
     }
 
     pub fn is_uav(&self) -> bool {
-        match self.ty {
-            ParameterType::RWByteAddressBuffer => true,
-            _ => false,
-        }
+        matches!(self.ty, ParameterType::RWByteAddressBuffer)
     }
 }
 
@@ -372,7 +366,7 @@ mod tests {
 
         let declaration = Declaration::from_string(file).unwrap();
         assert_eq!(declaration.name, "SimpleCompute");
-        assert_eq!(declaration.parameters.is_empty(), true);
+        assert!(declaration.parameters.is_empty());
     }
 
     #[test]
@@ -473,7 +467,7 @@ mod tests {
 
         let declaration = Declaration::from_string(file).unwrap();
         assert_eq!(declaration.name, "SimpleCompute");
-        assert_eq!(declaration.parameters.is_empty(), true);
+        assert!(declaration.parameters.is_empty());
         assert_eq!(declaration.passes.len(), 2);
         assert_eq!(declaration.passes[0].ty, PassType::Compute);
         assert_eq!(declaration.passes[1].name, "pass0");

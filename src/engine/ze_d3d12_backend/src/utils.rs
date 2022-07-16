@@ -12,24 +12,24 @@ use ze_gfx::{PixelFormat, SampleDesc};
 
 /// Struct used to wrap a IUnknown to become Send/Sync for uses with Mutexes and such
 #[derive(Clone)]
-pub struct SendableIUnknown<T: windows::core::Interface>(pub T);
+pub struct SendableIUnknown<T: Interface>(pub T);
 
-impl<T: windows::core::Interface> SendableIUnknown<T> {
+impl<T: Interface> SendableIUnknown<T> {
     pub fn new(object: T) -> Self {
-        Self { 0: object }
+        Self(object)
     }
 }
 
-impl<T: windows::core::Interface> From<T> for SendableIUnknown<T> {
+impl<T: Interface> From<T> for SendableIUnknown<T> {
     fn from(object: T) -> Self {
         Self::new(object)
     }
 }
 
-unsafe impl<T: windows::core::Interface> Send for SendableIUnknown<T> {}
-unsafe impl<T: windows::core::Interface> Sync for SendableIUnknown<T> {}
+unsafe impl<T: Interface> Send for SendableIUnknown<T> {}
+unsafe impl<T: Interface> Sync for SendableIUnknown<T> {}
 
-impl<T: windows::core::Interface> Deref for SendableIUnknown<T> {
+impl<T: Interface> Deref for SendableIUnknown<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -46,9 +46,7 @@ pub fn get_gpu_allocator_memory_location(
         MemoryLocation::GpuOnly => gpu_allocator::MemoryLocation::GpuOnly,
     }
 }
-pub fn get_ze_device_error_from_gpu_allocator_error(
-    error: gpu_allocator::AllocationError,
-) -> DeviceError {
+pub fn get_ze_device_error_from_gpu_allocator_error(error: AllocationError) -> DeviceError {
     match error {
         AllocationError::OutOfMemory => DeviceError::OutOfMemory,
         AllocationError::FailedToMap(_) => DeviceError::Unknown,
@@ -93,7 +91,7 @@ pub fn get_ze_sample_desc_from_dxgi_sample_desc(sample_desc: DXGI_SAMPLE_DESC) -
     }
 }
 
-pub fn convert_d3d_error_to_ze_device_error(result: windows::core::Error) -> DeviceError {
+pub fn convert_d3d_error_to_ze_device_error(result: Error) -> DeviceError {
     match result.code() {
         Win32::Foundation::E_OUTOFMEMORY => DeviceError::OutOfMemory,
         Win32::Graphics::Dxgi::DXGI_ERROR_INVALID_CALL => DeviceError::InvalidParameters,

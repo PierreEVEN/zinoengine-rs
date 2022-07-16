@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn connect_emit() {
-        let mut received = Arc::new(AtomicBool::new(false));
+        let received = Arc::new(AtomicBool::new(false));
         let mut signal: Signal<()> = Signal::default();
         {
             let received = received.clone();
@@ -61,12 +61,12 @@ mod tests {
 
         signal.emit(());
 
-        assert_eq!(received.load(Ordering::SeqCst), true);
+        assert!(received.load(Ordering::SeqCst));
     }
 
     #[test]
     fn connect_disconnect_and_emit() {
-        let mut received = Arc::new(AtomicBool::new(false));
+        let received = Arc::new(AtomicBool::new(false));
         let mut signal: Signal<()> = Signal::default();
         {
             let received = received.clone();
@@ -76,6 +76,6 @@ mod tests {
 
         signal.emit(());
 
-        assert_eq!(received.load(Ordering::SeqCst), false);
+        assert!(!received.load(Ordering::SeqCst));
     }
 }

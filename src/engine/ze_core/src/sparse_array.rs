@@ -31,7 +31,7 @@ impl<T> SparseArray<T> {
 
     pub fn get(&self, index: usize) -> Option<&T> {
         if let Some(object) = &self.data[index] {
-            Some(&object)
+            Some(object)
         } else {
             None
         }
@@ -117,7 +117,7 @@ pub struct SparseArrayIterator<'a, T> {
 impl<'a, T> SparseArrayIterator<'a, T> {
     pub fn new(array: &'a SparseArray<T>) -> Self {
         Self {
-            array: array,
+            array,
             current_index: 0,
         }
     }
@@ -147,7 +147,7 @@ pub struct SparseArrayIteratorMut<'a, T> {
 impl<'a, T> SparseArrayIteratorMut<'a, T> {
     pub fn new(array: &'a mut SparseArray<T>) -> Self {
         Self {
-            array: array,
+            array,
             current_index: 0,
         }
     }

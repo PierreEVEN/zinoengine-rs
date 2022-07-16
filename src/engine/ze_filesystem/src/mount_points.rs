@@ -2,8 +2,7 @@
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::env::consts::OS;
-use std::fs::{canonicalize, read_dir, File};
+use std::fs::{read_dir, File};
 use std::io::{Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -32,21 +31,21 @@ impl From<notify::Error> for FileSystemError {
     }
 }
 
+type StdMountPointWatcher = Arc<(dyn Fn(WatchEvent) + Send + Sync + 'static)>;
+
 pub struct StdMountPoint {
     alias: String,
     root: PathBuf,
     watcher: Mutex<RecommendedWatcher>,
-    watcher_closure_map:
-        Arc<Mutex<HashMap<PathBuf, Arc<(dyn Fn(WatchEvent) + Send + Sync + 'static)>>>>,
+    watcher_closure_map: Arc<Mutex<HashMap<PathBuf, StdMountPointWatcher>>>,
 }
 
 impl StdMountPoint {
     pub fn new(alias: &str, root: &Path) -> Box<Self> {
         let (tx, rx) = channel();
         let watcher = Watcher::new(tx, Duration::from_millis(100)).unwrap();
-        let watcher_closure_map: Arc<
-            Mutex<HashMap<PathBuf, Arc<(dyn Fn(WatchEvent) + Send + Sync + 'static)>>>,
-        > = Arc::new(Mutex::new(HashMap::new()));
+        let watcher_closure_map: Arc<Mutex<HashMap<PathBuf, StdMountPointWatcher>>> =
+            Arc::new(Mutex::new(HashMap::new()));
         let root = root.canonicalize().unwrap();
 
         {
@@ -61,8 +60,8 @@ impl StdMountPoint {
                         "IO Watcher Thread".to_string(),
                     );
                     loop {
-                        match rx.recv() {
-                            Ok(event) => match event {
+                        if let Ok(event) = rx.recv() {
+                            match event {
                                 DebouncedEvent::Write(path) => {
                                     let watcher_closure_map = watcher_closure_map.lock();
                                     if let Some(f) = watcher_closure_map.get(&path) {
@@ -76,8 +75,7 @@ impl StdMountPoint {
                                     }
                                 }
                                 _ => {}
-                            },
-                            Err(_) => {}
+                            }
                         }
                     }
                 })
@@ -86,7 +84,7 @@ impl StdMountPoint {
 
         Box::new(Self {
             alias: alias.to_string(),
-            root: root.to_path_buf(),
+            root,
             watcher: Mutex::new(watcher),
             watcher_closure_map,
         })
@@ -117,7 +115,6 @@ impl MountPoint for StdMountPoint {
 
         for entry in dir {
             let entry = entry?;
-            let root = self.root.to_string_lossy();
 
             let path = Self::fs_path_to_zefs_path(
                 &self.root.to_string_lossy(),

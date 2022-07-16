@@ -1,13 +1,13 @@
 ﻿use std::mem::{size_of, MaybeUninit};
-use std::sync::{Arc, Weak};
-use std::{ptr, slice};
+use std::slice;
+use std::sync::Arc;
 use ze_gfx::backend::{
-    Buffer, BufferDesc, BufferSRV, BufferUsageFlagBits, BufferUsageFlags, Device, MemoryLocation,
-    RenderTargetView, ResourceState, ShaderResourceView, ShaderResourceViewDesc,
-    ShaderResourceViewResource, ShaderResourceViewType, SwapChain,
+    Buffer, BufferDesc, BufferSRV, BufferUsageFlags, Device, MemoryLocation, RenderTargetView,
+    ResourceState, ShaderResourceView, ShaderResourceViewDesc, ShaderResourceViewResource,
+    ShaderResourceViewType, SwapChain,
 };
 use ze_gfx::PixelFormat;
-use ze_imgui_sys::{ImDrawData, ImDrawIdx, ImDrawVert, ImGuiViewport};
+use ze_imgui_sys::{ImDrawData, ImDrawIdx, ImDrawVert};
 
 #[derive(Default)]
 pub enum SwapChainType {
@@ -69,7 +69,7 @@ impl ViewportRendererData {
                         draw_list.VtxBuffer.Size as usize,
                     );
 
-                    let mut dst_vertex_slice =
+                    let dst_vertex_slice =
                         slice::from_raw_parts_mut(vertex_ptr, draw_list.VtxBuffer.Size as usize);
 
                     dst_vertex_slice.copy_from_slice(vertex_buffer_slice);
@@ -79,7 +79,7 @@ impl ViewportRendererData {
                         draw_list.IdxBuffer.Size as usize,
                     );
 
-                    let mut dst_index_slice =
+                    let dst_index_slice =
                         slice::from_raw_parts_mut(index_ptr, draw_list.IdxBuffer.Size as usize);
 
                     dst_index_slice.copy_from_slice(index_buffer_slice);

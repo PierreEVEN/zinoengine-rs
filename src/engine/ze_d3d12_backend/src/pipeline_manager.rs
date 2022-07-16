@@ -92,7 +92,7 @@ impl Hash for GraphicsPipelineEntry {
 
 impl From<&D3D12_GRAPHICS_PIPELINE_STATE_DESC> for GraphicsPipelineEntry {
     fn from(desc: &D3D12_GRAPHICS_PIPELINE_STATE_DESC) -> Self {
-        Self { 0: desc.clone() }
+        Self(desc.clone())
     }
 }
 

@@ -6,30 +6,30 @@ use std::time::Duration;
 
 #[test]
 fn spawn_one_job() {
-    let mut jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count() - 1);
-    let mut simple_bool = Arc::new(AtomicBool::new(false));
+    let jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count() - 1);
+    let simple_bool = Arc::new(AtomicBool::new(false));
     {
-        let mut simple_bool = simple_bool.clone();
+        let simple_bool = simple_bool.clone();
         let mut job = jobsystem.spawn(move |_, _| {
             simple_bool.store(true, Ordering::SeqCst);
         });
         job.schedule();
         job.wait();
     }
-    assert_eq!(simple_bool.load(Ordering::SeqCst), true);
+    assert!(simple_bool.load(Ordering::SeqCst));
 }
 
 #[test]
 fn spawn_one_job_five_childs() {
-    let mut jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count() - 1);
-    let mut counter = Arc::new(AtomicU32::new(0));
+    let jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count() - 1);
+    let counter = Arc::new(AtomicU32::new(0));
     {
-        let mut counter = counter.clone();
+        let counter = counter.clone();
         let mut parent = jobsystem.spawn(move |jobsystem, job| {
             counter.fetch_add(1, Ordering::SeqCst);
 
             for _ in 0..5 {
-                let mut counter = counter.clone();
+                let counter = counter.clone();
                 let mut child = jobsystem.spawn_child(job, move |_, _| {
                     counter.fetch_add(1, Ordering::SeqCst);
                 });
@@ -44,12 +44,12 @@ fn spawn_one_job_five_childs() {
 
 #[test]
 fn spawn_three_jobs_one_continuation_per_job() {
-    let mut jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count() - 1);
-    let mut counter = Arc::new(AtomicU32::new(0));
+    let jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count() - 1);
+    let counter = Arc::new(AtomicU32::new(0));
 
     for _ in 0..3 {
-        let mut counter = counter.clone();
-        let mut counter2 = counter.clone();
+        let counter = counter.clone();
+        let counter2 = counter.clone();
         let mut ancestor = jobsystem.spawn(move |_, _| {
             counter.fetch_add(1, Ordering::SeqCst);
         });

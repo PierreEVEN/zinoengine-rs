@@ -3,8 +3,7 @@ use parking_lot::Mutex;
 use raw_window_handle::{RawWindowHandle, Win32Handle};
 use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
-use std::mem::{size_of, transmute};
-use std::ops::Deref;
+use std::mem::size_of;
 use std::os::raw::c_short;
 use std::ptr::null;
 use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
@@ -20,9 +19,9 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::WindowsAndMessaging::*;
-use ze_core::maths::{RectI32, Vec2i32, Vec2u32};
+use ze_core::maths::{RectI32, Vec2i32};
 use ze_platform::{
-    Cursor, Message, Monitor, MouseButton, Platform, SystemCursor, Window, WindowFlagBits,
+    Cursor, Error, Message, Monitor, MouseButton, Platform, SystemCursor, Window, WindowFlagBits,
     WindowFlags,
 };
 
@@ -58,7 +57,7 @@ impl Hash for HashableHWND {
 
 impl From<HWND> for HashableHWND {
     fn from(hwnd: HWND) -> Self {
-        Self { 0: hwnd }
+        Self(hwnd)
     }
 }
 
@@ -73,14 +72,20 @@ impl WindowsPlatform {
         unsafe {
             timeBeginPeriod(1);
 
-            let mut win_class = WNDCLASSEXW::default();
-            win_class.cbSize = size_of::<WNDCLASSEXW>() as u32;
-            win_class.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
-            win_class.lpszClassName = PCWSTR(utf8_to_utf16(WIN_CLASS_NAME).as_ptr());
-            win_class.hbrBackground = HBRUSH(GetStockObject(BLACK_BRUSH).0);
-            win_class.hCursor = LoadCursorW(HINSTANCE::default(), IDC_ARROW).unwrap();
-            win_class.cbClsExtra = size_of::<usize>() as i32;
-            win_class.lpfnWndProc = Some(wnd_proc);
+            let win_class = WNDCLASSEXW {
+                cbSize: size_of::<WNDCLASSEXW>() as u32,
+                style: CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS,
+                lpfnWndProc: Some(wnd_proc),
+                cbClsExtra: size_of::<usize>() as i32,
+                cbWndExtra: 0,
+                hInstance: Default::default(),
+                hIcon: Default::default(),
+                hCursor: LoadCursorW(HINSTANCE::default(), IDC_ARROW).unwrap(),
+                hbrBackground: HBRUSH(GetStockObject(BLACK_BRUSH).0),
+                lpszMenuName: Default::default(),
+                lpszClassName: PCWSTR(utf8_to_utf16(WIN_CLASS_NAME).as_ptr()),
+                hIconSm: Default::default(),
+            };
             assert_ne!(RegisterClassExW(&win_class), 0);
 
             let platform = Arc::new(WindowsPlatform {
@@ -128,7 +133,7 @@ impl WindowsPlatform {
         unsafe {
             EnumDisplayMonitors(
                 HDC::default(),
-                std::ptr::null(),
+                null(),
                 Some(enum_display_monitors_callback),
                 LPARAM((&*monitors as *const _) as isize),
             );
@@ -248,9 +253,9 @@ unsafe extern "system" fn enum_display_monitors_callback(
 
     let mut dpi_x = 0;
     let mut dpi_y = 0;
-    GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
+    GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y).unwrap();
 
-    let mut monitors = (userdata.0 as *mut Vec<Monitor>)
+    let monitors = (userdata.0 as *mut Vec<Monitor>)
         .as_mut()
         .unwrap_unchecked();
 
@@ -296,8 +301,8 @@ impl Platform for WindowsPlatform {
             unsafe {
                 let mut msg = std::mem::zeroed();
                 if PeekMessageW(&mut msg, HWND::default(), 0, 0, PM_REMOVE) != false {
-                    TranslateMessage(&mut msg);
-                    DispatchMessageW(&mut msg);
+                    TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
                 }
             }
 
@@ -313,7 +318,7 @@ impl Platform for WindowsPlatform {
         x: i32,
         y: i32,
         flags: WindowFlags,
-    ) -> Result<Arc<dyn Window>, ()> {
+    ) -> Result<Arc<dyn Window>, Error> {
         let ex_style = WS_EX_LAYERED;
         let mut style = WINDOW_STYLE::default();
 
@@ -353,7 +358,7 @@ impl Platform for WindowsPlatform {
             );
 
             if GetLastError() != NO_ERROR {
-                return Err(());
+                return Err(Error::Unknown);
             }
 
             SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
@@ -371,8 +376,8 @@ impl Platform for WindowsPlatform {
             self.window_map
                 .lock()
                 .insert(hwnd.into(), Arc::downgrade(&window));
-            return Ok(window);
-        };
+            Ok(window)
+        }
     }
 
     fn create_system_cursor(&self, _: SystemCursor) -> Box<dyn Cursor> {

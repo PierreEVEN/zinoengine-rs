@@ -3,12 +3,7 @@ use std::collections::HashMap;
 use std::ptr;
 use std::sync::Arc;
 use ze_core::color::Color4f32;
-use ze_gfx::backend::{
-    ClearValue, CommandList, Device, RenderPassDesc, RenderPassTexture, RenderPassTextureLoadMode,
-    RenderPassTextureStoreMode, RenderTargetView, ResourceBarrier, ResourceState,
-    ResourceTransitionBarrier, ResourceTransitionBarrierResource, TextureUsageFlagBits,
-    TextureUsageFlags,
-};
+use ze_gfx::backend::*;
 use ze_gfx::PixelFormat;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -222,7 +217,7 @@ impl<'a> RenderGraph<'a> {
                     .get_render_target_view(physical_resource)
                     .unwrap();
                 render_targets.push(RenderPassTexture {
-                    render_target_view: &rtv,
+                    render_target_view: rtv,
                     load_mode: RenderPassTextureLoadMode::Clear,
                     store_mode: RenderPassTextureStoreMode::Preserve,
                     clear_value: ClearValue::Color([0.0, 0.0, 0.0, 1.0]),
@@ -319,7 +314,7 @@ impl<'a> RenderGraph<'a> {
         }
 
         for pass_handle in &self.final_pass_list {
-            let mut pass = &mut self.render_passes[pass_handle.0];
+            let pass = &mut self.render_passes[pass_handle.0];
 
             for color_output in &pass.color_outputs {
                 pass.invalidate_barriers.push(Barrier {
@@ -342,7 +337,7 @@ impl<'a> RenderGraph<'a> {
             });
     }
 
-    fn order_passes(&self, mut pass_list: &mut Vec<RenderPassHandle>) {
+    fn order_passes(&self, pass_list: &mut Vec<RenderPassHandle>) {
         let schedule = |index: usize,
                         passes: &mut Vec<RenderPassHandle>,
                         final_pass_list: &mut Vec<RenderPassHandle>| {
@@ -398,10 +393,10 @@ impl<'a> RenderGraph<'a> {
         pass: RenderPassHandle,
         stack_depth: usize,
     ) {
-        let mut render_pass = &self.render_passes[pass.0];
+        let render_pass = &self.render_passes[pass.0];
 
         // Collect pass dependencies and add them later on
-        let mut pass_dependencies = vec![];
+        let pass_dependencies = vec![];
 
         // TODO: Collect attachment inputs & color inputs
         // See https://github.com/Zino2201/Prism/blob/main/src/engine/prism_gfx/src/render_graph.rs

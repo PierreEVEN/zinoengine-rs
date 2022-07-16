@@ -1,6 +1,5 @@
 ﻿use hassle_rs::{Dxc, DxcIncludeHandler};
 use std::io::Read;
-use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use url::Url;
