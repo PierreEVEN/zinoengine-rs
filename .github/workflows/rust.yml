@@ -24,7 +24,7 @@ jobs:
         toolchain: stable
     - uses: Swatinem/rust-cache@v1 
     - name: Clippy
-      run: cargo clippy
+      run: cargo clippy --all-targets
     - name: Build Editor
       run: cargo build --verbose --bin ze_editor --lib
     - name: Run tests
