@@ -28,4 +28,4 @@ jobs:
     - name: Build Editor
       run: cargo build --verbose --bin ze_editor --lib
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --workspace --exclude ze_d3d12_backend
