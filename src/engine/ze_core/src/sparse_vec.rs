@@ -1,14 +1,14 @@
 ﻿use bit_vec::BitVec;
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 #[derive(Debug)]
-pub struct SparseArray<T> {
+pub struct SparseVec<T> {
     data: Vec<Option<T>>,
     allocated_bitset: BitVec<u32>,
     len: usize,
 }
 
-impl<T> SparseArray<T> {
+impl<T> SparseVec<T> {
     pub fn add(&mut self, elem: T) -> usize {
         let index = self.get_or_insert_free_index();
         debug_assert!(self.data[index].is_none());
@@ -91,7 +91,7 @@ impl<T> SparseArray<T> {
     }
 }
 
-impl<T> Default for SparseArray<T> {
+impl<T> Default for SparseVec<T> {
     fn default() -> Self {
         Self {
             data: vec![],
@@ -101,7 +101,7 @@ impl<T> Default for SparseArray<T> {
     }
 }
 
-impl<T> Index<usize> for SparseArray<T> {
+impl<T> Index<usize> for SparseVec<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -109,13 +109,19 @@ impl<T> Index<usize> for SparseArray<T> {
     }
 }
 
+impl<T> IndexMut<usize> for SparseVec<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index).unwrap()
+    }
+}
+
 pub struct SparseArrayIterator<'a, T> {
-    array: &'a SparseArray<T>,
+    array: &'a SparseVec<T>,
     current_index: usize,
 }
 
 impl<'a, T> SparseArrayIterator<'a, T> {
-    pub fn new(array: &'a SparseArray<T>) -> Self {
+    pub fn new(array: &'a SparseVec<T>) -> Self {
         Self {
             array,
             current_index: 0,
@@ -140,12 +146,12 @@ impl<'a, T> Iterator for SparseArrayIterator<'a, T> {
 }
 
 pub struct SparseArrayIteratorMut<'a, T> {
-    array: &'a mut SparseArray<T>,
+    array: &'a mut SparseVec<T>,
     current_index: usize,
 }
 
 impl<'a, T> SparseArrayIteratorMut<'a, T> {
-    pub fn new(array: &'a mut SparseArray<T>) -> Self {
+    pub fn new(array: &'a mut SparseVec<T>) -> Self {
         Self {
             array,
             current_index: 0,
@@ -171,11 +177,11 @@ impl<'a, T> Iterator for SparseArrayIteratorMut<'a, T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::sparse_array::SparseArray;
+    use crate::sparse_vec::SparseVec;
 
     #[test]
     fn insert_500_remove_index_350_insert_index_350() {
-        let mut array = SparseArray::default();
+        let mut array = SparseVec::default();
         for i in 0..500 {
             array.add(i);
         }
@@ -190,7 +196,7 @@ mod tests {
 
     #[test]
     fn insert_500_iterate_validate() {
-        let mut array = SparseArray::default();
+        let mut array = SparseVec::default();
         for i in 0..500 {
             array.add(i);
         }
@@ -202,7 +208,7 @@ mod tests {
 
     #[test]
     fn insert_500_iterate_mutate_to_200_validate() {
-        let mut array = SparseArray::default();
+        let mut array = SparseVec::default();
         for i in 0..500 {
             array.add(i);
         }

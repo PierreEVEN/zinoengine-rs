@@ -1,4 +1,4 @@
-﻿use crate::sparse_array::SparseArray;
+﻿use crate::sparse_vec::SparseVec;
 use parking_lot::Mutex;
 
 /// An object storing functions to be called when signaled
@@ -8,7 +8,7 @@ type Slot<Args> = Box<dyn FnMut(Args) + Send>;
 pub struct Handle(usize);
 
 pub struct Signal<Args> {
-    slots: Mutex<SparseArray<Slot<Args>>>,
+    slots: Mutex<SparseVec<Slot<Args>>>,
 }
 
 impl<Args> Signal<Args>

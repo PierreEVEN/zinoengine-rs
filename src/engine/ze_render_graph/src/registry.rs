@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
+use ze_core::sparse_vec::SparseVec;
 use ze_gfx::backend::{RenderTargetView, Texture};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -32,15 +33,47 @@ impl std::error::Error for Error {}
 
 /// Registry containing physical resources used by a render graph
 pub struct PhysicalResourceRegistry {
-    resources: Vec<PhysicalResource>,
+    resources: SparseVec<PhysicalResource>,
     resource_name_map: HashMap<String, PhysicalResourceHandle>,
 }
 
 impl PhysicalResourceRegistry {
     pub fn new() -> Self {
         Self {
-            resources: vec![],
+            resources: SparseVec::default(),
             resource_name_map: Default::default(),
+        }
+    }
+
+    pub fn insert_or_update_existing_texture(
+        &mut self,
+        name: &str,
+        texture: Arc<Texture>,
+        view: PhysicalResourceTextureView,
+    ) -> PhysicalResourceHandle {
+        if let Some(resource_handle) = self.resource_name_map.get(name) {
+            let resource = &mut self.resources[resource_handle.0];
+            if let PhysicalResource::Texture(existing_texture, existing_view) = resource {
+                *existing_texture = texture;
+                *existing_view = view;
+                *resource_handle
+            } else {
+                panic!("Existing resource {} is not a texture!", name)
+            }
+        } else {
+            let index = self.resources.add(PhysicalResource::Texture(texture, view));
+            let handle = PhysicalResourceHandle(index);
+            self.resource_name_map.insert(name.to_string(), handle);
+            handle
+        }
+    }
+
+    pub fn remove_resource(&mut self, name: &str) -> Result<(), Error> {
+        if let Some(resource_handle) = self.resource_name_map.remove(name) {
+            self.resources.remove(resource_handle.0);
+            Ok(())
+        } else {
+            Err(Error::UnknownResource)
         }
     }
 
@@ -71,30 +104,6 @@ impl PhysicalResourceRegistry {
         }
 
         Err(Error::InvalidResourceType)
-    }
-
-    pub fn insert_or_update_existing_texture(
-        &mut self,
-        name: &str,
-        texture: Arc<Texture>,
-        view: PhysicalResourceTextureView,
-    ) -> PhysicalResourceHandle {
-        if let Some(resource_handle) = self.resource_name_map.get(name) {
-            let resource = &mut self.resources[resource_handle.0];
-            if let PhysicalResource::Texture(existing_texture, existing_view) = resource {
-                *existing_texture = texture;
-                *existing_view = view;
-                *resource_handle
-            } else {
-                panic!("Existing resource {} is not a texture!", name)
-            }
-        } else {
-            let handle = PhysicalResourceHandle(self.resources.len());
-            self.resources
-                .push(PhysicalResource::Texture(texture, view));
-            self.resource_name_map.insert(name.to_string(), handle);
-            handle
-        }
     }
 
     pub fn get_or_create_texture(

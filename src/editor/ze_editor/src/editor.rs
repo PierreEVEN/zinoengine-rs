@@ -1,4 +1,6 @@
-﻿use std::env;
+﻿use crate::asset_explorer::AssetExplorer;
+use enumflags2::make_bitflags;
+use std::env;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
@@ -65,7 +67,7 @@ impl EditorApplication {
                 720,
                 (screen_0_bounds.width / 2) - (1280 / 2),
                 (screen_0_bounds.height / 2) - (720 / 2),
-                WindowFlags::from_flag(WindowFlagBits::Resizable),
+                make_bitflags! { WindowFlagBits::{ Resizable | Maximized } },
             )
             .unwrap();
 
@@ -97,6 +99,9 @@ impl EditorApplication {
         let mut running = true;
         let mut previous = Instant::now();
 
+        let mut main_registry = ze_render_graph::registry::PhysicalResourceRegistry::new();
+        let asset_explorer = AssetExplorer::default();
+
         while running {
             let delta_time = previous.elapsed().as_secs_f32();
             previous = Instant::now();
@@ -111,6 +116,7 @@ impl EditorApplication {
                     }
                     Message::WindowResized(event_window, _, _) => {
                         if Weak::ptr_eq(&event_window, &Arc::downgrade(&self.main_window)) {
+                            main_registry.remove_resource("backbuffer");
                             self.update_main_window_swapchain();
                         }
                     }
@@ -126,6 +132,11 @@ impl EditorApplication {
                 &*self.main_window,
             );
 
+            self.imgui
+                .dock_space_over_viewport(self.imgui.get_main_viewport());
+
+            asset_explorer.draw(&mut self.imgui);
+
             self.imgui.end_frame();
 
             // Render
@@ -138,13 +149,7 @@ impl EditorApplication {
                 .get_swapchain_backbuffer(swapchain, backbuffer_index)
                 .unwrap();
 
-            let mut main_cmd_list = self
-                .device
-                .create_command_list(QueueType::Graphics)
-                .unwrap();
-
-            let mut test = ze_render_graph::registry::PhysicalResourceRegistry::new();
-            test.insert_or_update_existing_texture(
+            main_registry.insert_or_update_existing_texture(
                 "backbuffer",
                 backbuffer.clone(),
                 PhysicalResourceTextureView::RTV(
@@ -152,7 +157,12 @@ impl EditorApplication {
                 ),
             );
 
-            let mut render_graph = RenderGraph::new(self.device.clone(), &mut test);
+            let mut main_cmd_list = self
+                .device
+                .create_command_list(QueueType::Graphics)
+                .unwrap();
+
+            let mut render_graph = RenderGraph::new(self.device.clone(), &mut main_registry);
             render_graph.add_graphics_pass(
                 "imgui",
                 |render_graph, render_pass| {

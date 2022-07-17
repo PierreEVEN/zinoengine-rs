@@ -12,4 +12,5 @@ fn main() {
     editor.run();
 }
 
+mod asset_explorer;
 mod editor;

@@ -292,7 +292,6 @@ impl Context {
 
         unsafe {
             igNewFrame();
-            igShowDemoWindow(std::ptr::null_mut());
         }
     }
 
@@ -478,8 +477,18 @@ impl Context {
         unsafe { igTextUnformatted(c_text, c_text.add(text.len())) };
     }
 
-    pub fn end(&mut self) {
+    pub fn end_window(&mut self) {
         unsafe { igEnd() };
+    }
+
+    pub fn dock_space_over_viewport(&self, viewport: &mut ImGuiViewport) {
+        unsafe {
+            igDockSpaceOverViewport(
+                viewport,
+                ImGuiDockNodeFlags__ImGuiDockNodeFlags_None,
+                std::ptr::null(),
+            );
+        }
     }
 }
 

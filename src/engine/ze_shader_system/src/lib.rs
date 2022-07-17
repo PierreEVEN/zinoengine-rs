@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use url::Url;
 use ze_core::signals::Signal;
-use ze_core::sparse_array::SparseArray;
+use ze_core::sparse_vec::SparseVec;
 use ze_core::{ze_error, ze_info};
 use ze_filesystem::{FileSystem, WatchEvent};
 use ze_gfx::backend::{Device, PipelineShaderStage, ShaderModule};
@@ -214,7 +214,7 @@ pub enum GetModulesError {
 
 pub struct ShaderManager {
     device: Arc<dyn Device>,
-    shaders: RwLock<SparseArray<Shader>>,
+    shaders: RwLock<SparseVec<Shader>>,
     shader_name_to_index_map: RwLock<HashMap<String, usize>>,
     module_cache: Arc<ShaderModulesCache>,
     compilation_manager: CompilationManager,
@@ -228,7 +228,7 @@ impl ShaderManager {
     ) -> Arc<Self> {
         Arc::new(Self {
             device,
-            shaders: RwLock::new(SparseArray::default()),
+            shaders: RwLock::new(SparseVec::default()),
             shader_name_to_index_map: Default::default(),
             module_cache: Arc::new(ShaderModulesCache::default()),
             compilation_manager: CompilationManager::new(jobsystem, shader_compiler),

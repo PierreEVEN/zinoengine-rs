@@ -1280,6 +1280,7 @@ dependencies = [
 name = "ze_editor"
 version = "0.1.0"
 dependencies = [
+ "enumflags2",
  "url",
  "ze_core",
  "ze_d3d12_backend",

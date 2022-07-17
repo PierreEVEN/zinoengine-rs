@@ -13,8 +13,8 @@ use windows::Win32::Foundation::{
     GetLastError, BOOL, HINSTANCE, HWND, LPARAM, LRESULT, NO_ERROR, POINT, RECT, WPARAM,
 };
 use windows::Win32::Graphics::Gdi::{
-    EnumDisplayMonitors, GetMonitorInfoW, GetStockObject, BLACK_BRUSH, HBRUSH, HDC, HMONITOR,
-    MONITORINFO,
+    ClientToScreen, EnumDisplayMonitors, GetMonitorInfoW, GetStockObject, BLACK_BRUSH, HBRUSH, HDC,
+    HMONITOR, MONITORINFO,
 };
 use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
@@ -313,10 +313,10 @@ impl Platform for WindowsPlatform {
     fn create_window(
         &self,
         name: &str,
-        width: u32,
-        height: u32,
-        x: i32,
-        y: i32,
+        mut width: u32,
+        mut height: u32,
+        mut x: i32,
+        mut y: i32,
         flags: WindowFlags,
     ) -> Result<Arc<dyn Window>, Error> {
         let ex_style = WS_EX_LAYERED;
@@ -366,16 +366,33 @@ impl Platform for WindowsPlatform {
             ShowWindow(
                 hwnd,
                 if flags.contains(WindowFlagBits::Maximized) {
-                    SW_MAXIMIZE
+                    SW_SHOWMAXIMIZED
                 } else {
                     SW_SHOW
                 },
             );
 
+            if flags.contains(WindowFlagBits::Maximized) {
+                let mut client_rect = RECT::default();
+                GetClientRect(hwnd, &mut client_rect);
+
+                let mut position = POINT {
+                    x: client_rect.left,
+                    y: client_rect.top,
+                };
+                ClientToScreen(hwnd, &mut position);
+
+                x = position.x;
+                y = position.y;
+                width = (client_rect.right - client_rect.left) as u32;
+                height = (client_rect.bottom - client_rect.top) as u32;
+            }
+
             let window = WindowsWindow::new(hwnd, width, height, x, y, style, ex_style);
             self.window_map
                 .lock()
                 .insert(hwnd.into(), Arc::downgrade(&window));
+
             Ok(window)
         }
     }
