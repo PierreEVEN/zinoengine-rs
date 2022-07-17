@@ -10,7 +10,7 @@ use ze_core::maths::{Matrix4f32, RectI32, Vec2f32, Vec2i32};
 use ze_gfx::backend::*;
 use ze_gfx::{utils, PixelFormat, SampleDesc};
 use ze_imgui_sys::*;
-use ze_platform::{Message, Platform, Window, WindowFlagBits, WindowFlags};
+use ze_platform::{Cursor, Message, Platform, SystemCursor, Window, WindowFlagBits, WindowFlags};
 use ze_shader_system::ShaderManager;
 
 pub struct Context {
@@ -22,6 +22,7 @@ pub struct Context {
     _font_texture: Arc<Texture>,
     font_texture_view: ShaderResourceView,
     sampler: Sampler,
+    cursors: [Box<dyn Cursor>; ImGuiMouseCursor__ImGuiMouseCursor_COUNT as usize],
 }
 
 impl Context {
@@ -135,6 +136,18 @@ impl Context {
             })
             .expect("Failed to create ImGui font texture view");
 
+        let cursors = [
+            platform.create_system_cursor(SystemCursor::Arrow),
+            platform.create_system_cursor(SystemCursor::Ibeam),
+            platform.create_system_cursor(SystemCursor::SizeAll),
+            platform.create_system_cursor(SystemCursor::SizeNorthSouth),
+            platform.create_system_cursor(SystemCursor::SizeWestEast),
+            platform.create_system_cursor(SystemCursor::SizeNorthEastSouthWest),
+            platform.create_system_cursor(SystemCursor::SizeNorthWestSouthEast),
+            platform.create_system_cursor(SystemCursor::Hand),
+            platform.create_system_cursor(SystemCursor::No),
+        ];
+
         let mut context = Box::new(Self {
             device,
             shader_manager,
@@ -144,6 +157,7 @@ impl Context {
             _font_texture: font_texture,
             sampler,
             font_texture_view,
+            cursors,
         });
 
         io.UserData = (context.as_mut() as *mut Context) as *mut c_void;
@@ -289,6 +303,16 @@ impl Context {
             x: mouse_position.x as f32,
             y: mouse_position.y as f32,
         };
+
+        // Update cursor
+        let cursor = unsafe { igGetMouseCursor() };
+
+        if io.MouseDrawCursor || cursor == ImGuiMouseCursor__ImGuiMouseCursor_None {
+            self.platform.set_cursor(None);
+        } else {
+            self.platform
+                .set_cursor(Some(&*self.cursors[cursor as usize]));
+        }
 
         unsafe {
             igNewFrame();

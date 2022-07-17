@@ -97,6 +97,7 @@ pub trait Platform: Send + Sync {
     ) -> Result<Arc<dyn Window>, Error>;
 
     fn create_system_cursor(&self, cursor: SystemCursor) -> Box<dyn Cursor>;
+    fn set_cursor(&self, cursor: Option<&dyn Cursor>);
     fn get_mouse_position(&self) -> Vec2i32;
 
     fn get_monitor_count(&self) -> usize;
