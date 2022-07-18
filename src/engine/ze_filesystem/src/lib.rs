@@ -1,4 +1,5 @@
-﻿use parking_lot::RwLock;
+﻿use enumflags2::*;
+use parking_lot::RwLock;
 use std::fmt::{Display, Formatter};
 use std::io::Read;
 use std::str::FromStr;
@@ -31,9 +32,35 @@ pub enum WatchEvent {
     Write(Url),
 }
 
+#[derive(PartialEq, Eq, Copy, Clone)]
+pub enum DirEntryType {
+    File,
+    Directory,
+}
+
+#[derive(PartialEq, Eq, Clone)]
+pub struct DirEntry {
+    pub ty: DirEntryType,
+    pub url: Url,
+}
+
+#[bitflags]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[repr(u32)]
+pub enum IterDirFlagBits {
+    Recursive = 1 << 0,
+}
+
+pub type IterDirFlags = BitFlags<IterDirFlagBits>;
+
 pub trait MountPoint: Send + Sync {
     fn read(&self, path: &Url) -> Result<Box<dyn Read>, FileSystemError>;
-    fn iter_dir(&self, path: &Url, f: &dyn Fn(&Url)) -> Result<(), FileSystemError>;
+    fn iter_dir(
+        &self,
+        path: &Url,
+        flags: IterDirFlags,
+        f: &mut dyn FnMut(DirEntry),
+    ) -> Result<(), FileSystemError>;
     fn watch(
         &self,
         path: &Url,
@@ -79,14 +106,19 @@ impl FileSystem {
         }
     }
 
-    pub fn iter_dir(&self, path: &Url, f: impl Fn(&Url)) -> Result<(), FileSystemError> {
+    pub fn iter_dir(
+        &self,
+        path: &Url,
+        flags: IterDirFlags,
+        mut f: impl FnMut(DirEntry),
+    ) -> Result<(), FileSystemError> {
         if let Some(index) = self.get_matching_mount_point_for_url(path) {
             let mount_point_guard = self.mount_points.read();
-            mount_point_guard[index].iter_dir(path, &f)
+            mount_point_guard[index].iter_dir(path, flags, &mut f)
         } else {
             let mount_point_guard = self.mount_points.read();
             for mount_point in mount_point_guard.iter() {
-                let result = mount_point.iter_dir(path, &f);
+                let result = mount_point.iter_dir(path, flags, &mut f);
                 match result {
                     Ok(_) => return Ok(()),
                     Err(error) => match error {

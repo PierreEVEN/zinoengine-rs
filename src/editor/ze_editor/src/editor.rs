@@ -100,7 +100,7 @@ impl EditorApplication {
         let mut previous = Instant::now();
 
         let mut main_registry = ze_render_graph::registry::PhysicalResourceRegistry::new();
-        let asset_explorer = AssetExplorer::default();
+        let mut asset_explorer = AssetExplorer::new(self.filesystem.clone());
 
         while running {
             let delta_time = previous.elapsed().as_secs_f32();

@@ -1300,6 +1300,7 @@ dependencies = [
 name = "ze_filesystem"
 version = "0.1.0"
 dependencies = [
+ "enumflags2",
  "notify",
  "parking_lot",
  "url",
@@ -1320,6 +1321,7 @@ dependencies = [
 name = "ze_imgui"
 version = "0.1.0"
 dependencies = [
+ "enumflags2",
  "ze_core",
  "ze_gfx",
  "ze_imgui_sys",

@@ -1,16 +1,18 @@
 use crate::renderer::{SwapChainType, ViewportRendererData};
 use crate::str_buffer::StrBuffer;
+use enumflags2::*;
 use std::alloc::Layout;
 use std::ffi::{CStr, CString};
 use std::mem::{size_of, MaybeUninit};
 use std::os::raw::*;
+use std::ptr::null_mut;
 use std::sync::Arc;
 use std::{mem, slice};
 use ze_core::maths::{Matrix4f32, RectI32, Vec2f32, Vec2i32};
 use ze_gfx::backend::*;
 use ze_gfx::{utils, PixelFormat, SampleDesc};
 use ze_imgui_sys::*;
-use ze_platform::{Cursor, Message, Platform, SystemCursor, Window, WindowFlagBits, WindowFlags};
+use ze_platform::{Cursor, Message, MouseButton, Platform, SystemCursor, Window};
 use ze_shader_system::ShaderManager;
 
 pub struct Context {
@@ -47,7 +49,7 @@ impl Context {
             ImFontAtlas_AddFontFromFileTTF(
                 io.Fonts,
                 file.as_ptr(),
-                16.0,
+                18.0,
                 std::ptr::null(),
                 std::ptr::null(),
             );
@@ -184,7 +186,10 @@ impl Context {
             style.ScrollbarRounding = 0.0;
             style.WindowMenuButtonPosition = ImGuiDir__ImGuiDir_Right;
             style.TabMinWidthForCloseButton = 0.0;
+            style.CellPadding = ImVec2::new(1.0, 0.0);
+            style.WindowPadding = ImVec2::new(3.0, 3.0);
             style.ItemSpacing = ImVec2::new(8.0, 4.0);
+            style.IndentSpacing = 9.0;
             style.WindowBorderSize = 0.0;
             style.FrameBorderSize = 0.0;
             style.PopupBorderSize = 1.0;
@@ -194,8 +199,8 @@ impl Context {
 
             colors[ImGuiCol__ImGuiCol_Text as usize] = ImVec4::new(0.79, 0.79, 0.79, 1.0);
             colors[ImGuiCol__ImGuiCol_TextDisabled as usize] = ImVec4::new(0.50, 0.50, 0.50, 1.0);
-            colors[ImGuiCol__ImGuiCol_WindowBg as usize] = ImVec4::new(0.22, 0.22, 0.22, 0.94);
-            colors[ImGuiCol__ImGuiCol_ChildBg as usize] = ImVec4::new(0.00, 0.00, 0.00, 0.00);
+            colors[ImGuiCol__ImGuiCol_WindowBg as usize] = ImVec4::new(0.07, 0.07, 0.07, 1.00);
+            colors[ImGuiCol__ImGuiCol_ChildBg as usize] = ImVec4::new(0.14, 0.14, 0.14, 1.00);
             colors[ImGuiCol__ImGuiCol_PopupBg as usize] = ImVec4::new(0.20, 0.20, 0.20, 0.94);
             colors[ImGuiCol__ImGuiCol_Border as usize] = ImVec4::new(0.09, 0.09, 0.09, 0.50);
             colors[ImGuiCol__ImGuiCol_BorderShadow as usize] = ImVec4::new(0.00, 0.00, 0.00, 0.00);
@@ -221,8 +226,8 @@ impl Context {
             colors[ImGuiCol__ImGuiCol_Button as usize] = ImVec4::new(0.29, 0.29, 0.29, 0.40);
             colors[ImGuiCol__ImGuiCol_ButtonHovered as usize] = ImVec4::new(0.26, 0.26, 0.26, 1.00);
             colors[ImGuiCol__ImGuiCol_ButtonActive as usize] = ImVec4::new(0.23, 0.23, 0.23, 1.00);
-            colors[ImGuiCol__ImGuiCol_Header as usize] = ImVec4::new(0.11, 0.11, 0.11, 0.31);
-            colors[ImGuiCol__ImGuiCol_HeaderHovered as usize] = ImVec4::new(0.13, 0.13, 0.13, 0.80);
+            colors[ImGuiCol__ImGuiCol_Header as usize] = ImVec4::new(0.27, 0.33, 0.43, 1.0);
+            colors[ImGuiCol__ImGuiCol_HeaderHovered as usize] = ImVec4::new(0.27, 0.33, 0.43, 0.45);
             colors[ImGuiCol__ImGuiCol_HeaderActive as usize] = ImVec4::new(0.12, 0.12, 0.12, 1.00);
             colors[ImGuiCol__ImGuiCol_Separator as usize] = ImVec4::new(0.15, 0.14, 0.16, 0.50);
             colors[ImGuiCol__ImGuiCol_SeparatorHovered as usize] =
@@ -254,7 +259,7 @@ impl Context {
             colors[ImGuiCol__ImGuiCol_TableBorderStrong as usize] =
                 ImVec4::new(0.31, 0.31, 0.35, 1.00);
             colors[ImGuiCol__ImGuiCol_TableBorderLight as usize] =
-                ImVec4::new(0.23, 0.23, 0.25, 1.00);
+                ImVec4::new(0.10, 0.10, 0.10, 1.00);
             colors[ImGuiCol__ImGuiCol_TableRowBg as usize] = ImVec4::new(0.00, 0.00, 0.00, 0.00);
             colors[ImGuiCol__ImGuiCol_TableRowBgAlt as usize] = ImVec4::new(1.00, 1.00, 1.00, 0.06);
             colors[ImGuiCol__ImGuiCol_TextSelectedBg as usize] =
@@ -316,6 +321,7 @@ impl Context {
 
         unsafe {
             igNewFrame();
+            igShowStyleEditor(null_mut());
         }
     }
 
@@ -490,15 +496,140 @@ impl Context {
     }
 }
 
+#[bitflags]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[repr(u32)]
+pub enum TableFlagBits {
+    Resizable = 1,
+    Reorderable = 2,
+    Hideable = 4,
+    Sortable = 8,
+    NoSavedSettings = 16,
+    ContextMenuInBody = 32,
+    RowBg = 64,
+    BordersInnerH = 128,
+    BordersOuterH = 256,
+    BordersInnerV = 512,
+    BordersOuterV = 1024,
+    NoBordersInBody = 2048,
+    NoBordersInBodyUntilResize = 4096,
+    SizingFixedFit = 8192,
+    SizingFixedSame = 16384,
+    NoHostExtendX = 65536,
+    NoHostExtendY = 131072,
+    NoKeepColumnsVisible = 262144,
+    PreciseWidths = 524288,
+    NoClip = 1048576,
+    PadOuterX = 2097152,
+    NoPadOuterX = 4194304,
+    NoPadInnerX = 8388608,
+    ScrollX = 16777216,
+    ScrollY = 33554432,
+    SortMulti = 67108864,
+    SortTristate = 134217728,
+}
+
+pub type TableFlags = BitFlags<TableFlagBits>;
+
+pub const TABLE_FLAG_SIZING_STRETCH_PROP: TableFlags =
+    TableFlags::from_bits_truncate_c(3 << 13, BitFlags::CONST_TOKEN);
+
+pub const TABLE_FLAG_SIZING_STRETCH_SAME: TableFlags =
+    TableFlags::from_bits_truncate_c(4 << 13, BitFlags::CONST_TOKEN);
+
+#[bitflags]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[repr(u32)]
+pub enum TableColumnFlagBits {
+    Disabled = 1,
+    DefaultHide = 2,
+    DefaultSort = 4,
+    WidthStretch = 8,
+    WidthFixed = 16,
+    NoResize = 32,
+    NoReorder = 64,
+    NoHide = 128,
+    NoClip = 256,
+    NoSort = 512,
+    NoSortAscending = 1024,
+    NoSortDescending = 2048,
+    NoHeaderLabel = 4096,
+    NoHeaderWidth = 8192,
+    PreferSortAscending = 16384,
+    PreferSortDescending = 32768,
+    IndentEnable = 65536,
+    IndentDisable = 131072,
+    IsEnabled = 16777216,
+    IsVisible = 33554432,
+    IsSorted = 67108864,
+    IsHovered = 134217728,
+}
+
+pub type TableColumnFlags = BitFlags<TableColumnFlagBits>;
+
+#[bitflags]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[repr(u32)]
+pub enum WindowFlagBits {
+    NoTitleBar = 1,
+    NoResize = 2,
+    NoMove = 4,
+    NoScrollbar = 8,
+    NoScrollWithMouse = 16,
+    NoCollapse = 32,
+    AlwaysAutoResize = 64,
+    NoBackground = 128,
+    NoSavedSettings = 256,
+    NoMouseInputs = 512,
+    MenuBar = 1024,
+    HorizontalScrollbar = 2048,
+    NoFocusOnAppearing = 4096,
+    NoBringToFrontOnFocus = 8192,
+    AlwaysVerticalScrollbar = 16384,
+    AlwaysHorizontalScrollbar = 32768,
+    AlwaysUseWindowPadding = 65536,
+    NoNavInputs = 262144,
+    NoNavFocus = 524288,
+    UnsavedDocument = 1048576,
+    NoDocking = 2097152,
+    NavFlattened = 8388608,
+    ChildWindow = 16777216,
+    Tooltip = 33554432,
+    Popup = 67108864,
+    Modal = 134217728,
+    ChildMenu = 268435456,
+    DockNodeHost = 536870912,
+}
+
+pub type WindowFlags = BitFlags<WindowFlagBits>;
+
 // UI elements
 impl Context {
-    pub fn window<'a>(&'a mut self, name: &'a str) -> window::WindowBuilder<'a> {
-        window::WindowBuilder::new(self, name)
-    }
-
     pub fn text(&mut self, text: &str) {
         let c_text = self.str_buffer.convert(text);
         unsafe { igTextUnformatted(c_text, c_text.add(text.len())) };
+    }
+
+    pub fn text_wrapped(&mut self, text: &str) {
+        let text = self.str_buffer.convert(text);
+        unsafe { igTextWrappedV(text, null_mut()) };
+    }
+
+    pub fn selectable(&mut self, label: &str, size: ImVec2) -> bool {
+        let label = self.str_buffer.convert(label);
+        unsafe {
+            igSelectable_Bool(
+                label,
+                true,
+                ImGuiSelectableFlags__ImGuiSelectableFlags_None,
+                size,
+            )
+        }
+    }
+
+    pub fn begin_window(&mut self, name: &str, flags: WindowFlags) -> bool {
+        let name = self.str_buffer.convert(name);
+        unsafe { igBegin(name, std::ptr::null_mut(), flags.bits() as i32) }
     }
 
     pub fn end_window(&mut self) {
@@ -513,6 +644,125 @@ impl Context {
                 std::ptr::null(),
             );
         }
+    }
+
+    pub fn get_available_content_region(&self) -> ImVec2 {
+        let mut vec = ImVec2::default();
+        unsafe {
+            igGetContentRegionAvail(&mut vec);
+        }
+        vec
+    }
+
+    pub fn begin_table(
+        &mut self,
+        name: &str,
+        column_count: u32,
+        flags: TableFlags,
+        outer_size: ImVec2,
+    ) -> bool {
+        let name = self.str_buffer.convert(name);
+        unsafe {
+            igBeginTable(
+                name,
+                column_count as c_int,
+                flags.bits() as i32,
+                outer_size,
+                0.0,
+            )
+        }
+    }
+
+    pub fn table_next_row(&mut self) {
+        unsafe {
+            igTableNextRow(ImGuiTableRowFlags__ImGuiTableRowFlags_None, 0.0);
+        }
+    }
+
+    pub fn table_next_column(&mut self) {
+        unsafe {
+            igTableNextColumn();
+        }
+    }
+
+    pub fn table_setup_column(
+        &mut self,
+        label: &str,
+        init_width_or_weight: f32,
+        flags: TableColumnFlags,
+    ) {
+        let label = self.str_buffer.convert(label);
+        unsafe {
+            igTableSetupColumn(
+                label,
+                flags.bits() as i32,
+                init_width_or_weight,
+                igGetID_Str(label),
+            );
+        }
+    }
+
+    pub fn end_table(&mut self) {
+        unsafe {
+            igEndTable();
+        }
+    }
+
+    pub fn is_item_clicked(&self, button: MouseButton) -> bool {
+        unsafe {
+            igIsItemClicked(match button {
+                MouseButton::Left => ImGuiMouseButton__ImGuiMouseButton_Left,
+                MouseButton::Middle => ImGuiMouseButton__ImGuiMouseButton_Middle,
+                MouseButton::Right => ImGuiMouseButton__ImGuiMouseButton_Right,
+            })
+        }
+    }
+}
+
+#[bitflags]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[repr(u32)]
+pub enum TreeNodeFlagBits {
+    Selected = 1 << 0,
+    Framed = 1 << 1,
+    AllowItemOverlap = 1 << 2,
+    NoTreePushOnOpen = 1 << 3,
+    NoAutoOpenOnLog = 1 << 4,
+    DefaultOpen = 1 << 5,
+    OpenOnDoubleClick = 1 << 6,
+    OpenOnArrow = 1 << 7,
+    Leaf = 1 << 8,
+    Bullet = 1 << 9,
+    FramePadding = 1 << 10,
+    SpanAvailWidth = 1 << 11,
+    SpanFullWidth = 1 << 12,
+    NavLeftJumpsBackHere = 1 << 13,
+}
+
+pub type TreeNodeFlags = BitFlags<TreeNodeFlagBits>;
+
+// Tree
+impl Context {
+    pub fn tree_node_ex(&mut self, id: &str, flags: TreeNodeFlags) -> bool {
+        let id = self.str_buffer.convert(id);
+        unsafe { igTreeNodeEx_Str(id, flags.bits() as i32) }
+    }
+
+    pub fn tree_pop(&mut self) {
+        unsafe {
+            igTreePop();
+        }
+    }
+}
+
+impl Context {
+    pub fn begin_child(&mut self, id: &str, size: ImVec2, border: bool) -> bool {
+        let id = self.str_buffer.convert(id);
+        unsafe { igBeginChild_Str(id, size, border, ImGuiWindowFlags__ImGuiWindowFlags_None) }
+    }
+
+    pub fn end_child(&self) {
+        unsafe { igEndChild() }
     }
 }
 
@@ -681,7 +931,7 @@ unsafe extern "C" fn platform_create_window(vp: *mut ImGuiViewport) {
                 viewport.Size.y as u32,
                 viewport.Pos.x as i32,
                 viewport.Pos.y as i32,
-                WindowFlags::from_flag(WindowFlagBits::Borderless),
+                ze_platform::WindowFlags::from_flag(ze_platform::WindowFlagBits::Borderless),
             )
             .unwrap();
         platform_data.write(ViewportPlatformData::new(window));
@@ -885,4 +1135,5 @@ unsafe extern "C" fn renderer_render_window(_: *mut ImGuiViewport, _: *mut c_voi
 
 mod renderer;
 mod str_buffer;
-pub mod window;
+
+pub extern crate ze_imgui_sys;

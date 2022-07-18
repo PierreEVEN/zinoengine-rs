@@ -1,4 +1,7 @@
-﻿use crate::{make_url_for_zefs, FileSystemError, MountPoint, WatchEvent};
+﻿use crate::{
+    make_url_for_zefs, DirEntry, DirEntryType, FileSystemError, IterDirFlags, MountPoint,
+    WatchEvent,
+};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -110,7 +113,12 @@ impl MountPoint for StdMountPoint {
         Ok(Box::new(file))
     }
 
-    fn iter_dir(&self, path: &Url, f: &dyn Fn(&Url)) -> Result<(), FileSystemError> {
+    fn iter_dir(
+        &self,
+        path: &Url,
+        flags: IterDirFlags,
+        f: &mut dyn FnMut(DirEntry),
+    ) -> Result<(), FileSystemError> {
         let dir = read_dir(self.get_path(path))?;
 
         for entry in dir {
@@ -121,10 +129,20 @@ impl MountPoint for StdMountPoint {
                 &entry.path().clone().canonicalize().unwrap(),
             );
             let path = make_url_for_zefs(self.get_alias(), &path).unwrap();
-            if entry.path().is_dir() {
-                self.iter_dir(&path, f)?;
-            } else {
-                f(&path);
+
+            let file_type = entry.file_type().unwrap();
+            let entry = DirEntry {
+                ty: if file_type.is_dir() {
+                    DirEntryType::Directory
+                } else {
+                    DirEntryType::File
+                },
+                url: path,
+            };
+
+            f(entry.clone());
+            if entry.ty == DirEntryType::Directory {
+                self.iter_dir(&entry.url, flags, f)?;
             }
         }
 

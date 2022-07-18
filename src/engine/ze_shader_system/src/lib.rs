@@ -10,7 +10,7 @@ use url::Url;
 use ze_core::signals::Signal;
 use ze_core::sparse_vec::SparseVec;
 use ze_core::{ze_error, ze_info};
-use ze_filesystem::{FileSystem, WatchEvent};
+use ze_filesystem::{FileSystem, IterDirFlagBits, IterDirFlags, WatchEvent};
 use ze_gfx::backend::{Device, PipelineShaderStage, ShaderModule};
 use ze_gfx::ShaderStageFlagBits;
 use ze_jobsystem::JobSystem;
@@ -237,28 +237,32 @@ impl ShaderManager {
 
     pub fn search_shaders(self: &Arc<ShaderManager>, filesystem: &Arc<FileSystem>, path: &Url) {
         filesystem
-            .iter_dir(path, |entry| {
-                let path = Path::new(entry.path());
-                let extension = path.extension().unwrap_or_else(|| OsStr::new(""));
-                if extension == "zeshader" {
-                    if let Ok(()) = self.load_zeshader_file(filesystem, entry) {
-                        // Setup a watch for hot-reloading
-                        let filesystem_closure = filesystem.clone();
-                        let shader_manager = Arc::downgrade(self);
-                        filesystem
-                            .watch(entry, move |event| {
-                                if let WatchEvent::Write(path) = event {
-                                    if let Some(shader_manager) = shader_manager.upgrade() {
-                                        shader_manager
-                                            .load_zeshader_file(&filesystem_closure, &path)
-                                            .unwrap();
+            .iter_dir(
+                path,
+                IterDirFlags::from_flag(IterDirFlagBits::Recursive),
+                |entry| {
+                    let path = Path::new(entry.url.path());
+                    let extension = path.extension().unwrap_or_else(|| OsStr::new(""));
+                    if extension == "zeshader" {
+                        if let Ok(()) = self.load_zeshader_file(filesystem, &entry.url) {
+                            // Setup a watch for hot-reloading
+                            let filesystem_closure = filesystem.clone();
+                            let shader_manager = Arc::downgrade(self);
+                            filesystem
+                                .watch(&entry.url, move |event| {
+                                    if let WatchEvent::Write(path) = event {
+                                        if let Some(shader_manager) = shader_manager.upgrade() {
+                                            shader_manager
+                                                .load_zeshader_file(&filesystem_closure, &path)
+                                                .unwrap();
+                                        }
                                     }
-                                }
-                            })
-                            .unwrap();
+                                })
+                                .unwrap();
+                        }
                     }
-                }
-            })
+                },
+            )
             .unwrap();
     }
 

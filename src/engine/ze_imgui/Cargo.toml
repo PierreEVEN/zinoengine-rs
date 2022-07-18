@@ -11,3 +11,4 @@ ze_platform = { version = "0.1.0", path = "../ze_platform" }
 ze_gfx = { version = "0.1.0", path = "../ze_gfx" }
 ze_imgui_sys = { version = "0.1.0", path = "../ze_imgui_sys" }
 ze_shader_system = { version = "0.1.0", path = "../ze_shader_system" }
+enumflags2 = "0.7.5"

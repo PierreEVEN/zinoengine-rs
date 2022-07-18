@@ -10,6 +10,12 @@ impl ImVec2 {
     }
 }
 
+impl Default for ImVec2 {
+    fn default() -> Self {
+        Self { x: 0.0, y: 0.0 }
+    }
+}
+
 impl ImVec4 {
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
         Self { x, y, z, w }
