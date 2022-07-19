@@ -1,6 +1,6 @@
 ﻿use crate::{
-    make_url_for_zefs, DirEntry, DirEntryType, FileSystemError, IterDirFlags, MountPoint,
-    WatchEvent,
+    make_url_for_zefs, DirEntry, DirEntryType, FileSystemError, IterDirFlagBits, IterDirFlags,
+    MountPoint, WatchEvent,
 };
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
@@ -141,7 +141,7 @@ impl MountPoint for StdMountPoint {
             };
 
             f(entry.clone());
-            if entry.ty == DirEntryType::Directory {
+            if flags.contains(IterDirFlagBits::Recursive) && entry.ty == DirEntryType::Directory {
                 self.iter_dir(&entry.url, flags, f)?;
             }
         }

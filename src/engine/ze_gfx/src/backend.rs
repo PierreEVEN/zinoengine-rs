@@ -13,6 +13,7 @@ pub enum BackendError {
 
 pub trait Backend: Send + Sync {
     fn create_device(&self) -> Result<Arc<dyn Device>, BackendError>;
+    fn get_name(&self) -> &str;
 }
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug)]

@@ -1,4 +1,5 @@
 ﻿use crate::asset_explorer::AssetExplorer;
+use crate::icon_manager::IconManager;
 use enumflags2::make_bitflags;
 use std::env;
 use std::path::Path;
@@ -33,6 +34,7 @@ pub struct EditorApplication {
     main_window_swapchain: Option<Arc<SwapChain>>,
     main_window_swapchain_rtvs: Vec<Arc<RenderTargetView>>,
     imgui: Box<Context>,
+    icon_manager: Arc<IconManager>,
 }
 
 impl EditorApplication {
@@ -81,15 +83,20 @@ impl EditorApplication {
         Self {
             platform,
             backend,
-            device,
+            device: device.clone(),
             jobsystem,
-            filesystem,
+            filesystem: filesystem.clone(),
             shader_compiler,
             shader_manager,
             main_window,
             main_window_swapchain: None,
             main_window_swapchain_rtvs: vec![],
             imgui,
+            icon_manager: Arc::new(IconManager::new(
+                device,
+                filesystem,
+                Url::from_str("vfs://main/assets/textures/editor/icons/").unwrap(),
+            )),
         }
     }
 
@@ -100,7 +107,8 @@ impl EditorApplication {
         let mut previous = Instant::now();
 
         let mut main_registry = ze_render_graph::registry::PhysicalResourceRegistry::new();
-        let mut asset_explorer = AssetExplorer::new(self.filesystem.clone());
+        let mut asset_explorer =
+            AssetExplorer::new(self.icon_manager.clone(), self.filesystem.clone());
 
         while running {
             let delta_time = previous.elapsed().as_secs_f32();
@@ -134,6 +142,15 @@ impl EditorApplication {
 
             self.imgui
                 .dock_space_over_viewport(self.imgui.get_main_viewport());
+
+            if self.imgui.begin_main_menu_bar() {
+                self.imgui.text(&format!(
+                    "{} | FPS: {}",
+                    self.backend.get_name(),
+                    (1.0 / delta_time) as u32
+                ));
+                self.imgui.end_main_menu_bar();
+            }
 
             asset_explorer.draw(&mut self.imgui);
 

@@ -49,7 +49,7 @@ impl Context {
             ImFontAtlas_AddFontFromFileTTF(
                 io.Fonts,
                 file.as_ptr(),
-                18.0,
+                16.0,
                 std::ptr::null(),
                 std::ptr::null(),
             );
@@ -182,12 +182,12 @@ impl Context {
             let style = unsafe { igGetStyle().as_mut().unwrap_unchecked() };
             style.WindowRounding = 0.0;
             style.FrameRounding = 3.0;
-            style.TabRounding = 0.0;
+            style.TabRounding = 2.0;
             style.ScrollbarRounding = 0.0;
             style.WindowMenuButtonPosition = ImGuiDir__ImGuiDir_Right;
             style.TabMinWidthForCloseButton = 0.0;
             style.CellPadding = ImVec2::new(1.0, 0.0);
-            style.WindowPadding = ImVec2::new(3.0, 3.0);
+            style.WindowPadding = ImVec2::new(3.0, 1.0);
             style.ItemSpacing = ImVec2::new(8.0, 4.0);
             style.IndentSpacing = 9.0;
             style.WindowBorderSize = 0.0;
@@ -202,9 +202,9 @@ impl Context {
             colors[ImGuiCol__ImGuiCol_WindowBg as usize] = ImVec4::new(0.07, 0.07, 0.07, 1.00);
             colors[ImGuiCol__ImGuiCol_ChildBg as usize] = ImVec4::new(0.14, 0.14, 0.14, 1.00);
             colors[ImGuiCol__ImGuiCol_PopupBg as usize] = ImVec4::new(0.20, 0.20, 0.20, 0.94);
-            colors[ImGuiCol__ImGuiCol_Border as usize] = ImVec4::new(0.09, 0.09, 0.09, 0.50);
+            colors[ImGuiCol__ImGuiCol_Border as usize] = ImVec4::new(0.09, 0.09, 0.09, 1.0);
             colors[ImGuiCol__ImGuiCol_BorderShadow as usize] = ImVec4::new(0.00, 0.00, 0.00, 0.00);
-            colors[ImGuiCol__ImGuiCol_FrameBg as usize] = ImVec4::new(0.16, 0.16, 0.16, 0.54);
+            colors[ImGuiCol__ImGuiCol_FrameBg as usize] = ImVec4::new(0.15, 0.15, 0.15, 1.0);
             colors[ImGuiCol__ImGuiCol_FrameBgHovered as usize] =
                 ImVec4::new(0.30, 0.30, 0.30, 0.40);
             colors[ImGuiCol__ImGuiCol_FrameBgActive as usize] = ImVec4::new(0.33, 0.33, 0.33, 0.67);
@@ -239,16 +239,16 @@ impl Context {
                 ImVec4::new(0.11, 0.11, 0.11, 0.67);
             colors[ImGuiCol__ImGuiCol_ResizeGripActive as usize] =
                 ImVec4::new(0.00, 0.00, 0.00, 0.95);
-            colors[ImGuiCol__ImGuiCol_Tab as usize] = ImVec4::new(0.16, 0.16, 0.16, 0.86);
+            colors[ImGuiCol__ImGuiCol_Tab as usize] = ImVec4::new(0.078, 0.078, 0.078, 1.0);
             colors[ImGuiCol__ImGuiCol_TabHovered as usize] = ImVec4::new(0.29, 0.29, 0.29, 0.80);
-            colors[ImGuiCol__ImGuiCol_TabActive as usize] = ImVec4::new(0.24, 0.24, 0.24, 1.00);
+            colors[ImGuiCol__ImGuiCol_TabActive as usize] = ImVec4::new(0.14, 0.14, 0.14, 1.00);
             colors[ImGuiCol__ImGuiCol_TabUnfocused as usize] = ImVec4::new(0.24, 0.24, 0.24, 0.97);
             colors[ImGuiCol__ImGuiCol_TabUnfocusedActive as usize] =
                 ImVec4::new(0.24, 0.24, 0.24, 1.00);
             colors[ImGuiCol__ImGuiCol_DockingPreview as usize] =
                 ImVec4::new(0.26, 0.59, 0.98, 0.70);
             colors[ImGuiCol__ImGuiCol_DockingEmptyBg as usize] =
-                ImVec4::new(0.20, 0.20, 0.20, 1.00);
+                ImVec4::new(0.12, 0.12, 0.12, 1.00);
             colors[ImGuiCol__ImGuiCol_PlotLines as usize] = ImVec4::new(0.61, 0.61, 0.61, 1.00);
             colors[ImGuiCol__ImGuiCol_PlotLinesHovered as usize] =
                 ImVec4::new(1.00, 0.43, 0.35, 1.00);
@@ -603,6 +603,31 @@ pub enum WindowFlagBits {
 
 pub type WindowFlags = BitFlags<WindowFlagBits>;
 
+pub enum StyleVar {
+    Alpha,
+    DisabledAlpha,
+    WindowPadding,
+    WindowRounding,
+    WindowBorderSize,
+    WindowMinSize,
+    WindowTitleAlign,
+    ChildRounding,
+    ChildBorderSize,
+    FramePadding,
+    FrameRounding,
+    FrameBorderSize,
+    FrameItemSpacing,
+    FrameItemInnerSpacing,
+    CellPadding,
+    ScrollbarSize,
+    ScrollbarRounding,
+    GrabMinSize,
+    GrabRounding,
+    TabRounding,
+    ButtonTextAlign,
+    SelectableTextAlign,
+}
+
 // UI elements
 impl Context {
     pub fn text(&mut self, text: &str) {
@@ -615,6 +640,52 @@ impl Context {
         unsafe { igTextWrappedV(text, null_mut()) };
     }
 
+    pub fn text_centered_wrapped(&mut self, text: &str, wrap_character_pos: usize) {
+        let window_width = unsafe { igGetWindowWidth() };
+
+        let mut words = vec![];
+        let mut split_idx = wrap_character_pos.min(text.len());
+        while text.is_char_boundary(split_idx) {
+            let (a, b) = text.split_at(split_idx);
+            words.push(a.to_string());
+            words.push(b.to_string());
+            split_idx += b.len() + wrap_character_pos;
+        }
+
+        for word in words {
+            let c_word = self.str_buffer.convert(&word);
+            let mut word_size = ImVec2::default();
+            unsafe {
+                igCalcTextSize(&mut word_size, c_word, c_word.add(word.len()), false, 0.0);
+                igSetCursorPosX((window_width - word_size.x) * 0.5);
+                igTextUnformatted(c_word, c_word.add(word.len()))
+            }
+        }
+    }
+
+    pub fn image(&mut self, srv: &ShaderResourceView, size: ImVec2) {
+        let srv = srv as *const _ as *mut ShaderResourceView as *mut c_void;
+
+        unsafe {
+            igImage(
+                srv,
+                size,
+                ImVec2::new(0.0, 0.0),
+                ImVec2::new(1.0, 1.0),
+                ImVec4::new(1.0, 1.0, 1.0, 1.0),
+                ImVec4::new(0.0, 0.0, 0.0, 0.0),
+            )
+        }
+    }
+
+    pub fn image_centered(&mut self, srv: &ShaderResourceView, size: ImVec2) {
+        unsafe {
+            let window_width = igGetWindowWidth();
+            igSetCursorPosX((window_width - size.x) * 0.5);
+        }
+        self.image(srv, size);
+    }
+
     pub fn selectable(&mut self, label: &str, size: ImVec2) -> bool {
         let label = self.str_buffer.convert(label);
         unsafe {
@@ -625,6 +696,24 @@ impl Context {
                 size,
             )
         }
+    }
+
+    pub fn set_cursor_pos(&mut self, cursor_pos: ImVec2) {
+        unsafe {
+            igSetCursorPos(cursor_pos);
+        }
+    }
+
+    pub fn push_style_var_f32(&mut self, var: StyleVar, val: f32) {
+        unsafe { igPushStyleVar_Float(var as i32, val) }
+    }
+
+    pub fn push_style_var_Vec2f32(&mut self, var: StyleVar, val: ImVec2) {
+        unsafe { igPushStyleVar_Vec2(var as i32, val) }
+    }
+
+    pub fn pop_style_var(&mut self, count: i32) {
+        unsafe { igPopStyleVar(count) }
     }
 
     pub fn begin_window(&mut self, name: &str, flags: WindowFlags) -> bool {
@@ -708,6 +797,14 @@ impl Context {
         }
     }
 
+    pub fn is_window_hovered(&self) -> bool {
+        unsafe { igIsWindowHovered(ImGuiHoveredFlags__ImGuiHoveredFlags_None) }
+    }
+
+    pub fn is_item_hovered(&self) -> bool {
+        unsafe { igIsItemHovered(ImGuiHoveredFlags__ImGuiHoveredFlags_None) }
+    }
+
     pub fn is_item_clicked(&self, button: MouseButton) -> bool {
         unsafe {
             igIsItemClicked(match button {
@@ -715,6 +812,45 @@ impl Context {
                 MouseButton::Middle => ImGuiMouseButton__ImGuiMouseButton_Middle,
                 MouseButton::Right => ImGuiMouseButton__ImGuiMouseButton_Right,
             })
+        }
+    }
+
+    pub fn begin_main_menu_bar(&self) -> bool {
+        unsafe { igBeginMainMenuBar() }
+    }
+
+    pub fn end_main_menu_bar(&self) {
+        unsafe { igEndMainMenuBar() }
+    }
+
+    pub fn dummy(&self, size: ImVec2) {
+        unsafe { igDummy(size) }
+    }
+
+    pub fn same_line(&self, offset_from_x: f32, spacing: f32) {
+        unsafe { igSameLine(offset_from_x, spacing) }
+    }
+}
+
+impl Context {
+    pub fn get_cursor_screen_pos(&mut self) -> ImVec2 {
+        let mut pos = ImVec2::default();
+        unsafe {
+            igGetCursorScreenPos(&mut pos);
+        }
+        pos
+    }
+
+    pub fn window_add_rect_filled(&mut self, min: ImVec2, max: ImVec2, color: ImVec4) {
+        unsafe {
+            ImDrawList_AddRectFilled(
+                igGetWindowDrawList(),
+                min,
+                max,
+                igColorConvertFloat4ToU32(color),
+                2.0,
+                ImDrawFlags__ImDrawFlags_None,
+            )
         }
     }
 }
@@ -756,9 +892,15 @@ impl Context {
 }
 
 impl Context {
-    pub fn begin_child(&mut self, id: &str, size: ImVec2, border: bool) -> bool {
+    pub fn begin_child(
+        &mut self,
+        id: &str,
+        size: ImVec2,
+        border: bool,
+        flags: WindowFlags,
+    ) -> bool {
         let id = self.str_buffer.convert(id);
-        unsafe { igBeginChild_Str(id, size, border, ImGuiWindowFlags__ImGuiWindowFlags_None) }
+        unsafe { igBeginChild_Str(id, size, border, flags.bits() as i32) }
     }
 
     pub fn end_child(&self) {
@@ -889,6 +1031,14 @@ fn draw_viewport_internal(
                     device.cmd_set_scissors(cmd_list, &[clip_rect]);
 
                     shader_data.base_vertex_location = cmd.VtxOffset + vertex_offset;
+                    if cmd.TextureId.is_null() {
+                        shader_data.texture = font_texture.get_descriptor_index();
+                    } else {
+                        let srv = cmd.TextureId as *mut ShaderResourceView;
+                        shader_data.texture =
+                            unsafe { srv.as_ref() }.unwrap().get_descriptor_index();
+                    }
+
                     device.cmd_push_constants(cmd_list, 0, unsafe {
                         slice::from_raw_parts(
                             (&shader_data as *const ShaderData) as *const u8,

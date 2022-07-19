@@ -1,24 +1,33 @@
-﻿use enumflags2::make_bitflags;
+﻿use crate::icon_manager::{Icon, IconManager};
+use enumflags2::make_bitflags;
+use std::char::EscapeUnicode;
+use std::cmp::Ordering;
 use std::str::FromStr;
 use std::sync::Arc;
 use url::{Position, Url};
 use ze_filesystem::{DirEntryType, FileSystem, IterDirFlagBits, IterDirFlags};
-use ze_imgui::ze_imgui_sys::ImVec2;
+use ze_imgui::ze_imgui_sys::*;
 use ze_imgui::*;
 use ze_platform::MouseButton;
 
 pub const ASSET_EXPLORER_ID: &str = "Asset Explorer";
 
 pub struct AssetExplorer {
+    icon_manager: Arc<IconManager>,
     filesystem: Arc<FileSystem>,
     current_directory: Url,
+    directory_icon: Option<Arc<Icon>>,
+    file_icon: Option<Arc<Icon>>,
 }
 
 impl AssetExplorer {
-    pub fn new(filesystem: Arc<FileSystem>) -> Self {
+    pub fn new(icon_manager: Arc<IconManager>, filesystem: Arc<FileSystem>) -> Self {
         Self {
+            icon_manager: icon_manager.clone(),
             filesystem,
             current_directory: Url::from_str("vfs://main/assets").unwrap(),
+            directory_icon: icon_manager.get_icon("icons8-folder-64"),
+            file_icon: icon_manager.get_icon("icons8-file-64"),
         }
     }
 
@@ -31,7 +40,7 @@ impl AssetExplorer {
         if imgui.begin_table(
             "MainTable",
             2,
-            make_bitflags! { TableFlagBits::{Resizable | BordersInnerV} },
+            make_bitflags! { TableFlagBits::{Resizable | NoBordersInBodyUntilResize} },
             imgui.get_available_content_region(),
         ) {
             imgui.table_setup_column(
@@ -58,11 +67,14 @@ impl AssetExplorer {
             "Directory List",
             imgui.get_available_content_region(),
             false,
+            WindowFlags::empty(),
         );
 
-        let column_count = (imgui.get_available_content_region().x / 90.0)
-            .min(15.0)
-            .max(0.0);
+        imgui.dummy(ImVec2::new(0.0, 10.0));
+        imgui.dummy(ImVec2::new(10.0, 0.0));
+        imgui.same_line(0.0, -1.0);
+
+        let column_count = (imgui.get_available_content_region().x / 90.0).clamp(1.0, 15.0);
         imgui.begin_table(
             "DirectoryListTable",
             column_count as u32,
@@ -72,15 +84,52 @@ impl AssetExplorer {
 
         imgui.table_next_row();
 
+        let mut entries = vec![];
         self.filesystem
             .iter_dir(&self.current_directory, IterDirFlags::empty(), |entry| {
-                imgui.table_next_column();
-
-                imgui.begin_child(entry.url.as_str(), ImVec2::new(90.0, 120.0), false);
-                imgui.text_wrapped(entry.url.path_segments().unwrap().last().unwrap());
-                imgui.end_child();
+                entries.push(entry);
             })
             .unwrap();
+
+        entries.sort_by(|a, b| {
+            if a.ty != b.ty && a.ty == DirEntryType::Directory {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        });
+
+        for entry in entries {
+            imgui.table_next_column();
+
+            imgui.begin_child(
+                entry.url.as_str(),
+                ImVec2::new(90.0, 120.0),
+                false,
+                WindowFlags::empty(),
+            );
+            if imgui.is_window_hovered() {
+                let cursor_screen_pos = imgui.get_cursor_screen_pos();
+                imgui.window_add_rect_filled(
+                    cursor_screen_pos,
+                    cursor_screen_pos + imgui.get_available_content_region(),
+                    unsafe { (*igGetStyle()).Colors[ImGuiCol__ImGuiCol_HeaderHovered as usize] },
+                );
+            }
+
+            imgui.dummy(ImVec2::new(0.0, 5.0));
+
+            let icon = if entry.ty == DirEntryType::Directory {
+                &self.directory_icon
+            } else {
+                &self.file_icon
+            };
+            if let Some(icon) = icon {
+                imgui.image_centered(&icon.srv, ImVec2::new(64.0, 64.0));
+            }
+            imgui.text_centered_wrapped(entry.url.path_segments().unwrap().last().unwrap(), 8);
+            imgui.end_child();
+        }
 
         imgui.end_table();
         imgui.end_child();
@@ -91,6 +140,7 @@ impl AssetExplorer {
             "Directory Hierarchy",
             imgui.get_available_content_region(),
             false,
+            WindowFlags::empty(),
         );
         self.draw_hierarchy_recursive(imgui, &Url::from_str("vfs://main/assets").unwrap());
         imgui.end_child();
@@ -109,15 +159,11 @@ impl AssetExplorer {
 
             let filesystem = self.filesystem.clone();
             filesystem
-                .iter_dir(
-                    url,
-                    IterDirFlags::from_flag(IterDirFlagBits::Recursive),
-                    |entry| {
-                        if entry.ty == DirEntryType::Directory {
-                            self.draw_hierarchy_recursive(imgui, &entry.url);
-                        }
-                    },
-                )
+                .iter_dir(url, IterDirFlags::empty(), |entry| {
+                    if entry.ty == DirEntryType::Directory {
+                        self.draw_hierarchy_recursive(imgui, &entry.url);
+                    }
+                })
                 .unwrap();
             imgui.tree_pop();
         }

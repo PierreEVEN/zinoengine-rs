@@ -14,3 +14,4 @@ fn main() {
 
 mod asset_explorer;
 mod editor;
+mod icon_manager;

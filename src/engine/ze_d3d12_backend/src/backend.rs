@@ -125,4 +125,8 @@ impl Backend for D3D12Backend {
             }
         }
     }
+
+    fn get_name(&self) -> &str {
+        "D3D12"
+    }
 }
