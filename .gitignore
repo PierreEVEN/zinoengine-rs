@@ -1,7 +1,9 @@
 .idea
+.vscode
 target/
 build/
 *.dll
 *.exe
 *.o
+*.DotSettings.user
 imgui.ini
