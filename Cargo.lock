@@ -1345,6 +1345,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "uuid"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
+
+[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1603,16 +1609,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "ze_asset_system"
+name = "ze-asset-system"
 version = "0.1.0"
 dependencies = [
+ "parking_lot",
  "url",
- "ze_core",
- "ze_filesystem",
+ "uuid",
+ "ze-core",
+ "ze-filesystem",
 ]
 
 [[package]]
-name = "ze_core"
+name = "ze-core"
 version = "0.1.0"
 dependencies = [
  "array-init",
@@ -1625,7 +1633,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ze_d3d12_backend"
+name = "ze-d3d12-backend"
 version = "0.1.0"
 dependencies = [
  "bindgen",
@@ -1636,78 +1644,79 @@ dependencies = [
  "thread_local",
  "tinyvec",
  "windows 0.36.1",
- "ze_core",
- "ze_gfx",
+ "ze-core",
+ "ze-gfx",
 ]
 
 [[package]]
-name = "ze_d3d12_shader_compiler"
+name = "ze-d3d12-shader-compiler"
 version = "0.1.0"
 dependencies = [
  "hassle-rs",
  "url",
- "ze_filesystem",
- "ze_gfx",
- "ze_shader_compiler",
+ "ze-filesystem",
+ "ze-gfx",
+ "ze-shader-compiler",
 ]
 
 [[package]]
-name = "ze_editor"
+name = "ze-editor"
 version = "0.1.0"
 dependencies = [
  "enumflags2",
  "image",
  "parking_lot",
  "url",
- "ze_core",
- "ze_d3d12_backend",
- "ze_d3d12_shader_compiler",
- "ze_filesystem",
- "ze_gfx",
- "ze_imgui",
- "ze_jobsystem",
- "ze_platform",
- "ze_render_graph",
- "ze_shader_compiler",
- "ze_shader_system",
- "ze_windows_platform",
+ "ze-asset-system",
+ "ze-core",
+ "ze-d3d12-backend",
+ "ze-d3d12-shader-compiler",
+ "ze-filesystem",
+ "ze-gfx",
+ "ze-imgui",
+ "ze-jobsystem",
+ "ze-platform",
+ "ze-render-graph",
+ "ze-shader-compiler",
+ "ze-shader-system",
+ "ze-windows-platform",
 ]
 
 [[package]]
-name = "ze_filesystem"
+name = "ze-filesystem"
 version = "0.1.0"
 dependencies = [
  "enumflags2",
  "notify",
  "parking_lot",
  "url",
- "ze_core",
+ "ze-core",
 ]
 
 [[package]]
-name = "ze_gfx"
+name = "ze-gfx"
 version = "0.1.0"
 dependencies = [
  "enumflags2",
  "parking_lot",
  "raw-window-handle",
- "ze_core",
+ "ze-core",
 ]
 
 [[package]]
-name = "ze_imgui"
+name = "ze-imgui"
 version = "0.1.0"
 dependencies = [
  "enumflags2",
- "ze_core",
- "ze_gfx",
- "ze_imgui_sys",
- "ze_platform",
- "ze_shader_system",
+ "ze-core",
+ "ze-gfx",
+ "ze-imgui-sys",
+ "ze-platform",
+ "ze-shader-system",
 ]
 
 [[package]]
-name = "ze_imgui_sys"
+name = "ze-imgui-sys"
 version = "0.1.0"
 dependencies = [
  "bindgen",
@@ -1715,68 +1724,72 @@ dependencies = [
 ]
 
 [[package]]
-name = "ze_jobsystem"
+name = "ze-jobsystem"
 version = "0.1.0"
 dependencies = [
  "crossbeam",
  "num_cpus",
  "parking_lot",
  "thread_local",
- "ze_core",
+ "ze-core",
 ]
 
 [[package]]
-name = "ze_platform"
+name = "ze-platform"
 version = "0.1.0"
 dependencies = [
  "enumflags2",
  "raw-window-handle",
- "ze_core",
+ "ze-core",
 ]
 
 [[package]]
-name = "ze_render_graph"
+name = "ze-render-graph"
 version = "0.1.0"
 dependencies = [
- "ze_core",
- "ze_gfx",
+ "ze-core",
+ "ze-gfx",
 ]
 
 [[package]]
-name = "ze_shader_compiler"
+name = "ze-shader-compiler"
 version = "0.1.0"
 dependencies = [
- "ze_core",
- "ze_gfx",
+ "ze-core",
+ "ze-gfx",
 ]
 
 [[package]]
-name = "ze_shader_system"
+name = "ze-shader-system"
 version = "0.1.0"
 dependencies = [
  "parking_lot",
  "url",
- "ze_core",
- "ze_filesystem",
- "ze_gfx",
- "ze_jobsystem",
- "ze_shader_compiler",
+ "ze-core",
+ "ze-filesystem",
+ "ze-gfx",
+ "ze-jobsystem",
+ "ze-shader-compiler",
 ]
 
 [[package]]
-name = "ze_texture_asset"
+name = "ze-texture-asset"
 version = "0.1.0"
+dependencies = [
+ "url",
+ "ze-asset-system",
+]
 
 [[package]]
-name = "ze_windows_platform"
+name = "ze-windows-platform"
 version = "0.1.0"
 dependencies = [
  "enumflags2",
  "parking_lot",
  "raw-window-handle",
  "windows 0.37.0",
- "ze_core",
- "ze_platform",
+ "ze-core",
+ "ze-platform",
 ]
 
 [[package]]

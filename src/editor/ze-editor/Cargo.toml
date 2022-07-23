@@ -1,0 +1,29 @@
+[package]
+name = "ze-editor"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[[bin]]
+name = "ze-editor"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ze-core = { version = "0.1.0", path = "../../engine/ze-core" }
+ze-platform = { version = "0.1.0", path = "../../engine/ze-platform" }
+ze-asset-system = { version = "0.1.0", path = "../../engine/ze-asset-system" }
+ze-windows-platform = { version = "0.1.0", path = "../../engine/ze-windows-platform" }
+ze-gfx = { version = "0.1.0", path = "../../engine/ze-gfx" }
+ze-d3d12-backend = { version = "0.1.0", path = "../../engine/ze-d3d12-backend" }
+ze-jobsystem = { version = "0.1.0", path = "../../engine/ze-jobsystem" }
+ze-shader-system = { version = "0.1.0", path = "../../engine/ze-shader-system" }
+ze-filesystem = { version = "0.1.0", path = "../../engine/ze-filesystem" }
+ze-d3d12-shader-compiler = { version = "0.1.0", path = "../../engine/ze-d3d12-shader-compiler" }
+ze-shader-compiler = { version = "0.1.0", path = "../../engine/ze-shader-compiler" }
+ze-imgui = { version = "0.1.0", path = "../../engine/ze-imgui" }
+ze-render-graph = { version = "0.1.0", path = "../../engine/ze-render-graph" }
+url = "2.2.2"
+enumflags2 = "0.7.5"
+parking_lot = "0.12.1"
+image = "0.24.2"

@@ -26,6 +26,6 @@ jobs:
     - name: Clippy
       run: cargo clippy --all-targets --no-deps
     - name: Build Editor
-      run: cargo build --verbose --bin ze_editor --lib
+      run: cargo build --verbose --bin ze-editor --lib
     - name: Run tests
       run: cargo test --workspace --exclude ze_d3d12_backend

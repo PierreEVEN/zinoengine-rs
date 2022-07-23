@@ -1,0 +1,10 @@
+[package]
+name = "ze-texture-asset"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ze-asset-system = { version = "0.1.0", path = "../ze-asset-system" }
+url = "2.2.2"
