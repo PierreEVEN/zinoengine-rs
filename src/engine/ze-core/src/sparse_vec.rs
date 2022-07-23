@@ -1,6 +1,9 @@
 ﻿use bit_vec::BitVec;
 use std::ops::{Index, IndexMut};
 
+/// Wrapper around `Vec` that guarantee stable indices for elements.
+///
+/// When an element is removed, the internal `Vec` is not resized, the element's slot is marked as free.
 #[derive(Debug)]
 pub struct SparseVec<T> {
     data: Vec<Option<T>>,

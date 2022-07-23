@@ -2,7 +2,11 @@
 
 An attempt to make a 3D game engine in Rust.
 
-## How to compile [WINDOWS ONLY]
+| Platform | CI Status                                                                                |
+|----------|------------------------------------------------------------------------------------------|
+| Windows  | ![WinCI](https://github.com/Zino2201/zinoengine-rs/actions/workflows/rust.yml/badge.svg) |
+
+## How to compile (Windows)
 - Clone the project and its submodules
 - Install clang and set your `LIBCLANG_PATH` env var to the directory containing `clang.exe`
 - `cargo build`
