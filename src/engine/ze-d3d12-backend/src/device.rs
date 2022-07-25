@@ -172,7 +172,7 @@ impl D3D12Device {
 
                     let pipeline = self
                         .pipeline_manager
-                        .get_graphics_pipeline(&self.device, desc);
+                        .get_or_create_graphics_pipeline(&self.device, desc);
                     unsafe {
                         command_list.cmd_list.SetPipelineState(pipeline);
                     }
@@ -184,10 +184,10 @@ impl D3D12Device {
         }
     }
 
-    pub fn get_allocator(&self) -> &Mutex<SendableAllocator> {
+    pub fn allocator(&self) -> &Mutex<SendableAllocator> {
         &self.allocator
     }
-    pub fn get_device(&self) -> &SendableIUnknown<ID3D12Device> {
+    pub fn device(&self) -> &SendableIUnknown<ID3D12Device> {
         &self.device
     }
 }
@@ -430,7 +430,9 @@ impl Device for D3D12Device {
             }
         };
 
-        let handle = self.descriptor_manager.get_cbv_srv_uav_descriptor_handle();
+        let handle = self
+            .descriptor_manager
+            .allocate_cbv_srv_uav_descriptor_handle();
         unsafe {
             self.device
                 .CreateShaderResourceView(resource, &d3d_desc, handle.0)
@@ -475,7 +477,7 @@ impl Device for D3D12Device {
             }
         }
 
-        let handle = self.descriptor_manager.get_rtv_descriptor_handle();
+        let handle = self.descriptor_manager.allocate_rtv_descriptor_handle();
         unsafe {
             self.device
                 .CreateRenderTargetView(resource, &d3d_desc, handle.0)
@@ -495,7 +497,7 @@ impl Device for D3D12Device {
         info: &SwapChainDesc,
         old_swapchain: Option<SwapChain>,
     ) -> Result<SwapChain, DeviceError> {
-        let swapchain_buffer_count = std::cmp::max(2, self.frame_manager.get_frame_count());
+        let swapchain_buffer_count = std::cmp::max(2, self.frame_manager.frame_count());
 
         if let Some(old_swapchain) = old_swapchain {
             let swapchain = old_swapchain
@@ -508,8 +510,8 @@ impl Device for D3D12Device {
             drop(old_swapchain);
 
             self.frame_manager
-                .get_current_frame()
-                .get_resource_manager()
+                .current_frame()
+                .resource_manager()
                 .destroy_resources();
 
             unsafe {
@@ -643,8 +645,8 @@ impl Device for D3D12Device {
     fn create_command_list(&self, queue_type: QueueType) -> Result<CommandList, DeviceError> {
         let (_, cmd_list) = self
             .frame_manager
-            .get_current_frame()
-            .get_command_manager()
+            .current_frame()
+            .command_manager()
             .create_command_list(self, queue_type);
 
         let cmd_list = D3D12CommandList::new(cmd_list);
@@ -652,8 +654,8 @@ impl Device for D3D12Device {
         if queue_type != QueueType::Transfer {
             unsafe {
                 let heaps = [
-                    Some(self.descriptor_manager.get_cbv_srv_uav_heap().clone()),
-                    Some(self.descriptor_manager.get_sampler_heap().clone()),
+                    Some(self.descriptor_manager.cbv_srv_uav_heap().clone()),
+                    Some(self.descriptor_manager.sampler_heap().clone()),
                 ];
                 cmd_list.cmd_list.SetDescriptorHeaps(&heaps);
                 cmd_list
@@ -672,7 +674,7 @@ impl Device for D3D12Device {
     }
 
     fn create_sampler(&self, desc: &SamplerDesc) -> Result<Sampler, DeviceError> {
-        let handle = self.descriptor_manager.get_sampler_descriptor_handle();
+        let handle = self.descriptor_manager.allocate_sampler_descriptor_handle();
         unsafe {
             self.device.CreateSampler(
                 &D3D12_SAMPLER_DESC {
@@ -706,7 +708,7 @@ impl Device for D3D12Device {
         ))
     }
 
-    fn get_buffer_mapped_ptr(&self, buffer: &Buffer) -> Option<*mut u8> {
+    fn buffer_mapped_ptr(&self, buffer: &Buffer) -> Option<*mut u8> {
         let buffer = unsafe {
             buffer
                 .backend_data
@@ -717,7 +719,7 @@ impl Device for D3D12Device {
         buffer.mapped_ptr
     }
 
-    fn get_texture_subresource_layout(
+    fn texture_subresource_layout(
         &self,
         texture: &Texture,
         subresource_index: u32,
@@ -755,7 +757,7 @@ impl Device for D3D12Device {
         }
     }
 
-    fn get_swapchain_backbuffer_count(&self, swapchain: &SwapChain) -> usize {
+    fn swapchain_backbuffer_count(&self, swapchain: &SwapChain) -> usize {
         let swapchain = unsafe {
             swapchain
                 .backend_data
@@ -766,7 +768,7 @@ impl Device for D3D12Device {
         swapchain.textures.len()
     }
 
-    fn get_swapchain_backbuffer_index(&self, swapchain: &SwapChain) -> u32 {
+    fn swapchain_backbuffer_index(&self, swapchain: &SwapChain) -> u32 {
         let swapchain = unsafe {
             swapchain
                 .backend_data
@@ -777,7 +779,7 @@ impl Device for D3D12Device {
         unsafe { swapchain.swapchain.GetCurrentBackBufferIndex() }
     }
 
-    fn get_swapchain_backbuffer(
+    fn swapchain_backbuffer(
         &self,
         swapchain: &SwapChain,
         index: u32,
@@ -1403,10 +1405,12 @@ impl Device for D3D12Device {
         wait_fences: &[&Fence],
         signal_fences: &[&Fence],
     ) {
-        self.frame_manager
-            .get_current_frame()
-            .get_command_manager()
-            .submit(queue_type, command_lists, wait_fences, signal_fences);
+        self.frame_manager.current_frame().command_manager().submit(
+            queue_type,
+            command_lists,
+            wait_fences,
+            signal_fences,
+        );
     }
 
     fn wait_idle(&self) {
@@ -1448,8 +1452,8 @@ impl Drop for D3D12Buffer {
         let allocation =
             unsafe { mem::replace(&mut self.allocation, MaybeUninit::uninit()).assume_init() };
         self.frame_manager
-            .get_current_frame()
-            .get_resource_manager()
+            .current_frame()
+            .resource_manager()
             .enqueue_resource_destruction(self.resource.clone(), Some(allocation));
     }
 }
@@ -1480,8 +1484,8 @@ impl Drop for D3D12Texture {
             unsafe { mem::replace(&mut self.allocation, MaybeUninit::uninit()).assume_init() };
 
         self.frame_manager
-            .get_current_frame()
-            .get_resource_manager()
+            .current_frame()
+            .resource_manager()
             .enqueue_resource_destruction(self.texture.deref().clone().into(), allocation);
     }
 }
@@ -1499,7 +1503,7 @@ impl Drop for D3D12Sampler {
 }
 
 impl ShaderVisibleResource for D3D12Sampler {
-    fn get_descriptor_index(&self) -> u32 {
+    fn descriptor_index(&self) -> u32 {
         self.handle.1
     }
 }
@@ -1529,7 +1533,7 @@ impl Drop for D3D12ShaderResourceView {
 }
 
 impl ShaderVisibleResource for D3D12ShaderResourceView {
-    fn get_descriptor_index(&self) -> u32 {
+    fn descriptor_index(&self) -> u32 {
         self.handle.1
     }
 }
@@ -1643,7 +1647,7 @@ impl D3D12CommandList {
         }
     }
 
-    pub fn get_cmd_list(&self) -> &ID3D12GraphicsCommandList4 {
+    pub fn cmd_list(&self) -> &ID3D12GraphicsCommandList4 {
         &self.cmd_list
     }
 }

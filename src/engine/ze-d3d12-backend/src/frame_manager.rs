@@ -36,11 +36,11 @@ impl Frame {
         self.command_manager.wait_for_work();
     }
 
-    pub fn get_resource_manager(&self) -> &ResourceManager {
+    pub fn resource_manager(&self) -> &ResourceManager {
         &self.resource_manager
     }
 
-    pub fn get_command_manager(&self) -> &CommandManager {
+    pub fn command_manager(&self) -> &CommandManager {
         &self.command_manager
     }
 }
@@ -86,11 +86,9 @@ impl FrameManager {
             })
             .unwrap();
 
-        self.get_current_frame().get_command_manager().new_frame();
+        self.current_frame().command_manager().new_frame();
 
-        self.get_current_frame()
-            .get_resource_manager()
-            .destroy_resources();
+        self.current_frame().resource_manager().destroy_resources();
     }
 
     pub fn wait_for_work(&self) {
@@ -99,11 +97,11 @@ impl FrameManager {
         }
     }
 
-    pub fn get_current_frame(&self) -> &Frame {
+    pub fn current_frame(&self) -> &Frame {
         &self.frames[self.current_frame.load(Ordering::SeqCst)]
     }
 
-    pub fn get_frame_count(&self) -> usize {
+    pub fn frame_count(&self) -> usize {
         self.frame_count
     }
 }

@@ -1,5 +1,5 @@
 [package]
-name = "ze-asset-system"
+name = "ze-asset-server"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,9 +7,13 @@ edition = "2021"
 
 [dependencies]
 ze-core = { version = "0.1.0", path = "../ze-core" }
+ze-asset-system = { version = "0.1.0", path = "../ze-asset-system" }
 ze-filesystem = { version = "0.1.0", path = "../ze-filesystem" }
-uuid = {version = "1.1.2", features = [ "serde" ] }
+parking_lot = "0.12.1"
 url = "2.2.2"
+sled = "0.34.7"
 serde = "1.0.140"
 serde_derive = "1.0.140"
-serde_yaml = "0.8.26"
+bincode = { version = "2.0.0-rc.1", features = [ "serde" ] }
+sha2 = "0.10.2"
+uuid = {version = "1.1.2", features = [ "serde" ] }

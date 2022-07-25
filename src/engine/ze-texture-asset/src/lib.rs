@@ -1,15 +1,14 @@
-pub enum TextureFormat {
-    R8G8B8A8,
-    R8G8B8A8sRGB,
-}
+use serde_derive::{Deserialize, Serialize};
+use ze_gfx::PixelFormat;
 
-/// Raw texture format containing all data to compile an asset
-pub struct RawTexture {
-    format: TextureFormat,
-    pixels: Vec<u8>,
+#[derive(Serialize, Deserialize)]
+pub struct Texture {
+    width: u32,
+    height: u32,
+    depth: u32,
+    format: PixelFormat,
+    mip_levels: Vec<Vec<u8>>,
 }
-
-pub struct Texture {}
 
 pub mod importer;
 pub mod loader;

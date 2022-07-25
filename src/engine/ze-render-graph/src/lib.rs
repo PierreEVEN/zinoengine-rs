@@ -139,9 +139,9 @@ impl<'a> RenderGraph<'a> {
     fn set_backbuffer(&mut self, name: &str) {
         let rtv = self
             .registry
-            .get_render_target_view(
+            .render_target_view(
                 self.registry
-                    .get_handle_from_name(name)
+                    .handle_from_name(name)
                     .expect("Backbuffer not present in the registry!"),
             )
             .unwrap();
@@ -212,10 +212,7 @@ impl<'a> RenderGraph<'a> {
             for output in &render_pass.color_outputs {
                 let resource = &self.resources[output.0];
                 let physical_resource = resource.physical_handle.unwrap();
-                let rtv = self
-                    .registry
-                    .get_render_target_view(physical_resource)
-                    .unwrap();
+                let rtv = self.registry.render_target_view(physical_resource).unwrap();
                 render_targets.push(RenderPassTexture {
                     render_target_view: rtv,
                     load_mode: RenderPassTextureLoadMode::Clear,
@@ -232,7 +229,7 @@ impl<'a> RenderGraph<'a> {
                     barriers.push(ResourceBarrier::Transition(ResourceTransitionBarrier {
                         resource: ResourceTransitionBarrierResource::Texture(
                             self.registry
-                                .get_texture(resource.physical_handle.unwrap())
+                                .texture(resource.physical_handle.unwrap())
                                 .unwrap(),
                         ),
                         source_state: invalidate.src_state,
@@ -261,7 +258,7 @@ impl<'a> RenderGraph<'a> {
                     barriers.push(ResourceBarrier::Transition(ResourceTransitionBarrier {
                         resource: ResourceTransitionBarrierResource::Texture(
                             self.registry
-                                .get_texture(resource.physical_handle.unwrap())
+                                .texture(resource.physical_handle.unwrap())
                                 .unwrap(),
                         ),
                         source_state: flush.src_state,

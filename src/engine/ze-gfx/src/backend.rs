@@ -13,7 +13,7 @@ pub enum BackendError {
 
 pub trait Backend: Send + Sync {
     fn create_device(&self) -> Result<Arc<dyn Device>, BackendError>;
-    fn get_name(&self) -> &str;
+    fn name(&self) -> &str;
 }
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug)]
@@ -333,19 +333,19 @@ pub trait Device: Send + Sync {
     fn create_sampler(&self, desc: &SamplerDesc) -> Result<Sampler, DeviceError>;
 
     // Buffer functions
-    fn get_buffer_mapped_ptr(&self, buffer: &Buffer) -> Option<*mut u8>;
+    fn buffer_mapped_ptr(&self, buffer: &Buffer) -> Option<*mut u8>;
 
     // Texture functions
-    fn get_texture_subresource_layout(
+    fn texture_subresource_layout(
         &self,
         texture: &Texture,
         subresource_index: u32,
     ) -> TextureSubresourceLayout;
 
     // Swapchain functions
-    fn get_swapchain_backbuffer_count(&self, swapchain: &SwapChain) -> usize;
-    fn get_swapchain_backbuffer_index(&self, swapchain: &SwapChain) -> u32;
-    fn get_swapchain_backbuffer(
+    fn swapchain_backbuffer_count(&self, swapchain: &SwapChain) -> usize;
+    fn swapchain_backbuffer_index(&self, swapchain: &SwapChain) -> u32;
+    fn swapchain_backbuffer(
         &self,
         swapchain: &SwapChain,
         index: u32,
@@ -511,13 +511,13 @@ impl Sampler {
         Self { desc, backend_data }
     }
 
-    pub fn get_descriptor_index(&self) -> u32 {
-        self.backend_data.get_descriptor_index()
+    pub fn descriptor_index(&self) -> u32 {
+        self.backend_data.descriptor_index()
     }
 }
 
 pub trait ShaderVisibleResource: Any + Send {
-    fn get_descriptor_index(&self) -> u32;
+    fn descriptor_index(&self) -> u32;
 }
 
 pub struct ShaderResourceView {
@@ -530,8 +530,8 @@ impl ShaderResourceView {
         Self { desc, backend_data }
     }
 
-    pub fn get_descriptor_index(&self) -> u32 {
-        self.backend_data.get_descriptor_index()
+    pub fn descriptor_index(&self) -> u32 {
+        self.backend_data.descriptor_index()
     }
 }
 

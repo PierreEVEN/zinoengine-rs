@@ -59,7 +59,7 @@ pub fn copy_data_to_buffer(
         }
         device.submit(QueueType::Transfer, &[&list], &[], &[]);
     } else {
-        let buffer_data = device.get_buffer_mapped_ptr(buffer).unwrap();
+        let buffer_data = device.buffer_mapped_ptr(buffer).unwrap();
         unsafe {
             ptr::copy_nonoverlapping(data.as_ptr(), buffer_data, data.len());
         }
@@ -85,7 +85,7 @@ pub fn copy_data_to_texture(
             || dst_resource_state == ResourceState::CopyWrite
     );
 
-    let subresource_layout = device.get_texture_subresource_layout(texture, 0);
+    let subresource_layout = device.texture_subresource_layout(texture, 0);
     let staging = device.create_buffer(
         &BufferDesc {
             size_bytes: subresource_layout.size_in_bytes,
@@ -96,7 +96,7 @@ pub fn copy_data_to_texture(
         "copy_data_to_texture Staging buffer",
     )?;
 
-    let buffer_data = device.get_buffer_mapped_ptr(&staging).unwrap();
+    let buffer_data = device.buffer_mapped_ptr(&staging).unwrap();
     unsafe {
         let width = texture.desc.width as usize;
         let height = texture.desc.height as usize;

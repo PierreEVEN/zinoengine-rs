@@ -1,7 +1,6 @@
-pub mod backend;
-pub mod utils;
+use serde_derive::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum PixelFormat {
     Unknown,
@@ -31,3 +30,6 @@ pub enum ShaderStageFlagBits {
     Fragment = 1 << 1,
     Compute = 1 << 2,
 }
+
+pub mod backend;
+pub mod utils;

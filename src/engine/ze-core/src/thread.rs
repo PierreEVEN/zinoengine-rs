@@ -13,6 +13,6 @@ pub fn set_thread_name(id: ThreadId, name: String) {
     THREAD_NAME_MAP.write().insert(id, Arc::new(name));
 }
 
-pub fn get_thread_name(id: ThreadId) -> Option<Arc<String>> {
+pub fn thread_name(id: ThreadId) -> Option<Arc<String>> {
     THREAD_NAME_MAP.read().get(&id).cloned()
 }

@@ -301,8 +301,8 @@ impl Context {
 
         io.DeltaTime = delta_time;
         io.DisplaySize = ImVec2 {
-            x: main_viewport_window.get_width() as f32,
-            y: main_viewport_window.get_height() as f32,
+            x: main_viewport_window.width() as f32,
+            y: main_viewport_window.height() as f32,
         };
         io.MousePos = ImVec2 {
             x: mouse_position.x as f32,
@@ -369,10 +369,10 @@ impl Context {
                 {
                     let swapchain = unsafe { swapchain.assume_init_ref() };
 
-                    let backbuffer_index = self.device.get_swapchain_backbuffer_index(swapchain);
+                    let backbuffer_index = self.device.swapchain_backbuffer_index(swapchain);
                     let backbuffer = self
                         .device
-                        .get_swapchain_backbuffer(swapchain, backbuffer_index)
+                        .swapchain_backbuffer(swapchain, backbuffer_index)
                         .unwrap();
 
                     self.device.cmd_resource_barrier(
@@ -450,7 +450,7 @@ impl Context {
 
     pub fn update_monitors(&mut self) {
         let mut io = unsafe { igGetPlatformIO().as_mut().unwrap_unchecked() };
-        let monitor_count = self.platform.get_monitor_count();
+        let monitor_count = self.platform.monitor_count();
         if io.Monitors.Capacity > 0 {
             unsafe {
                 igMemFree(io.Monitors.Data as *mut c_void);
@@ -465,7 +465,7 @@ impl Context {
 
         let monitors = unsafe { slice::from_raw_parts_mut(io.Monitors.Data, monitor_count) };
         for (index, monitor) in monitors.iter_mut().enumerate() {
-            let platform_monitor = self.platform.get_monitor(index);
+            let platform_monitor = self.platform.monitor(index);
             monitor.MainPos = ImVec2 {
                 x: platform_monitor.bounds.x as f32,
                 y: platform_monitor.bounds.y as f32,
@@ -486,12 +486,12 @@ impl Context {
         }
     }
 
-    pub fn get_str_buffer(&mut self) -> &mut StrBuffer {
+    pub fn str_buffer(&mut self) -> &mut StrBuffer {
         &mut self.str_buffer
     }
 
     #[allow(clippy::mut_from_ref)]
-    pub fn get_main_viewport(&self) -> &mut ImGuiViewport {
+    pub fn main_viewport(&self) -> &mut ImGuiViewport {
         unsafe { igGetMainViewport().as_mut().unwrap_unchecked() }
     }
 }
@@ -735,7 +735,7 @@ impl Context {
         }
     }
 
-    pub fn get_available_content_region(&self) -> ImVec2 {
+    pub fn available_content_region(&self) -> ImVec2 {
         let mut vec = ImVec2::default();
         unsafe {
             igGetContentRegionAvail(&mut vec);
@@ -851,7 +851,7 @@ impl Context {
 }
 
 impl Context {
-    pub fn get_cursor_screen_pos(&mut self) -> ImVec2 {
+    pub fn cursor_screen_pos(&mut self) -> ImVec2 {
         let mut pos = ImVec2::default();
         unsafe {
             igGetCursorScreenPos(&mut pos);
@@ -982,12 +982,12 @@ fn draw_viewport_internal(
                     .vertex_buffer_srv
                     .as_ref()
                     .unwrap()
-                    .get_descriptor_index(),
-                texture: font_texture.get_descriptor_index(),
-                texture_sampler: sampler.get_descriptor_index(),
+                    .descriptor_index(),
+                texture: font_texture.descriptor_index(),
+                texture_sampler: sampler.descriptor_index(),
             };
 
-            device.cmd_set_shader_stages(cmd_list, &shader.get_pipeline_stages());
+            device.cmd_set_shader_stages(cmd_list, &shader.pipeline_stages());
 
             let mut blend_state = PipelineBlendState::default();
             blend_state.render_targets[0] = PipelineRenderTargetBlendDesc {
@@ -1050,11 +1050,10 @@ fn draw_viewport_internal(
 
                     shader_data.base_vertex_location = cmd.VtxOffset + vertex_offset;
                     if cmd.TextureId.is_null() {
-                        shader_data.texture = font_texture.get_descriptor_index();
+                        shader_data.texture = font_texture.descriptor_index();
                     } else {
                         let srv = cmd.TextureId as *mut ShaderResourceView;
-                        shader_data.texture =
-                            unsafe { srv.as_ref() }.unwrap().get_descriptor_index();
+                        shader_data.texture = unsafe { srv.as_ref() }.unwrap().descriptor_index();
                     }
 
                     device.cmd_push_constants(cmd_list, 0, unsafe {
@@ -1127,8 +1126,8 @@ unsafe extern "C" fn platform_get_window_pos(vp: *mut ImGuiViewport, pos: *mut I
         .as_ref()
         .unwrap_unchecked();
 
-    (*pos).x = platform_user_data.window.get_position().x as f32;
-    (*pos).y = platform_user_data.window.get_position().y as f32;
+    (*pos).x = platform_user_data.window.position().x as f32;
+    (*pos).y = platform_user_data.window.position().y as f32;
 }
 
 unsafe extern "C" fn platform_set_window_pos(vp: *mut ImGuiViewport, pos: ImVec2) {
@@ -1193,21 +1192,21 @@ unsafe extern "C" fn renderer_create_window(vp: *mut ImGuiViewport) {
                     format: PixelFormat::R8G8B8A8Unorm,
                     sample_desc: SampleDesc::default(),
                     usage_flags: TextureUsageFlags::from_flag(TextureUsageFlagBits::RenderTarget),
-                    window_handle: (*platform_data).window.get_handle(),
+                    window_handle: (*platform_data).window.handle(),
                 },
                 None,
             )
             .unwrap();
 
         let mut swapchain_render_target_views = vec![];
-        for i in 0..context.device.get_swapchain_backbuffer_count(&swapchain) {
+        for i in 0..context.device.swapchain_backbuffer_count(&swapchain) {
             swapchain_render_target_views.push(
                 context
                     .device
                     .create_render_target_view(&RenderTargetViewDesc {
                         resource: context
                             .device
-                            .get_swapchain_backbuffer(&swapchain, i as u32)
+                            .swapchain_backbuffer(&swapchain, i as u32)
                             .unwrap(),
                         format: PixelFormat::R8G8B8A8Unorm,
                         ty: RenderTargetViewType::Texture2D(Texture2DRTV { mip_level: 0 }),
@@ -1263,21 +1262,21 @@ unsafe extern "C" fn renderer_set_window_size(vp: *mut ImGuiViewport, size: ImVe
                     format: PixelFormat::R8G8B8A8Unorm,
                     sample_desc: SampleDesc::default(),
                     usage_flags: TextureUsageFlags::from_flag(TextureUsageFlagBits::RenderTarget),
-                    window_handle: (*platform_user_data).window.get_handle(),
+                    window_handle: (*platform_user_data).window.handle(),
                 },
                 Some(Arc::try_unwrap(old_swapchain.assume_init()).expect("Failed to unwrap arc!")),
             )
             .unwrap();
 
         let mut swapchain_render_target_views = vec![];
-        for i in 0..context.device.get_swapchain_backbuffer_count(&swapchain) {
+        for i in 0..context.device.swapchain_backbuffer_count(&swapchain) {
             swapchain_render_target_views.push(
                 context
                     .device
                     .create_render_target_view(&RenderTargetViewDesc {
                         resource: context
                             .device
-                            .get_swapchain_backbuffer(&swapchain, i as u32)
+                            .swapchain_backbuffer(&swapchain, i as u32)
                             .unwrap(),
                         format: PixelFormat::R8G8B8A8Unorm,
                         ty: RenderTargetViewType::Texture2D(Texture2DRTV { mip_level: 0 }),

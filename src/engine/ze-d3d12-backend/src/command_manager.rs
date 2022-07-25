@@ -66,7 +66,7 @@ impl CommandAllocator {
             (list, command_list.command_list.clone())
         } else {
             let list: windows::core::Result<ID3D12GraphicsCommandList> = unsafe {
-                device.get_device().CreateCommandList(
+                device.device().CreateCommandList(
                     0,
                     list_type,
                     self.allocator.deref().clone(),
@@ -157,10 +157,10 @@ impl CommandQueue {
                 };
 
                 unsafe {
-                    command_list.get_cmd_list().Close().unwrap_unchecked();
+                    command_list.cmd_list().Close().unwrap_unchecked();
                     lists.push(Some(
                         command_list
-                            .get_cmd_list()
+                            .cmd_list()
                             .cast::<ID3D12CommandList>()
                             .unwrap_unchecked(),
                     ));
@@ -187,12 +187,8 @@ impl CommandQueue {
         comannd_list_type: D3D12_COMMAND_LIST_TYPE,
     ) -> &SyncRefCell<CommandAllocator> {
         self.allocators.get_or(|| {
-            let allocator: ID3D12CommandAllocator = unsafe {
-                device
-                    .get_device()
-                    .CreateCommandAllocator(comannd_list_type)
-            }
-            .unwrap();
+            let allocator: ID3D12CommandAllocator =
+                unsafe { device.device().CreateCommandAllocator(comannd_list_type) }.unwrap();
 
             utils::set_resource_name(
                 &allocator.clone().into(),

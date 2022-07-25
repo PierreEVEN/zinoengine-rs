@@ -121,21 +121,21 @@ impl Window for WindowsWindow {
         }
     }
 
-    fn get_handle(&self) -> RawWindowHandle {
+    fn handle(&self) -> RawWindowHandle {
         let mut handle = Win32Handle::empty();
         handle.hwnd = self.hwnd.0 as *mut std::ffi::c_void;
         RawWindowHandle::Win32(handle)
     }
 
-    fn get_width(&self) -> u32 {
+    fn width(&self) -> u32 {
         self.width.load(Ordering::SeqCst)
     }
 
-    fn get_height(&self) -> u32 {
+    fn height(&self) -> u32 {
         self.height.load(Ordering::SeqCst)
     }
 
-    fn get_position(&self) -> Vec2i32 {
+    fn position(&self) -> Vec2i32 {
         Vec2i32::new(self.x.load(Ordering::SeqCst), self.y.load(Ordering::SeqCst))
     }
 }

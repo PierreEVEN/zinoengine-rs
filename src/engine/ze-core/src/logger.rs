@@ -1,4 +1,4 @@
-﻿use crate::thread::get_thread_name;
+﻿use crate::thread::thread_name;
 use chrono::Local;
 use lazy_static::lazy_static;
 use std::fmt::Arguments;
@@ -119,7 +119,7 @@ impl Sink for StdoutSink {
     fn log(&self, message: &Message) {
         let mut stdout = StandardStream::stdout(ColorChoice::Auto);
         let thread_name = {
-            match get_thread_name(message.thread) {
+            match thread_name(message.thread) {
                 None => "Unknown Thread".to_string(),
                 Some(str) => str.as_ref().clone(),
             }

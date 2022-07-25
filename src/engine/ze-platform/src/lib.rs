@@ -46,10 +46,10 @@ pub trait Window: Downcast + Send + Sync {
     fn set_title(&self, title: &str);
     fn show(&self);
 
-    fn get_handle(&self) -> RawWindowHandle;
-    fn get_width(&self) -> u32;
-    fn get_height(&self) -> u32;
-    fn get_position(&self) -> Vec2i32;
+    fn handle(&self) -> RawWindowHandle;
+    fn width(&self) -> u32;
+    fn height(&self) -> u32;
+    fn position(&self) -> Vec2i32;
 }
 impl_downcast!(Window);
 
@@ -98,8 +98,8 @@ pub trait Platform: Send + Sync {
 
     fn create_system_cursor(&self, cursor: SystemCursor) -> Box<dyn Cursor>;
     fn set_cursor(&self, cursor: Option<&dyn Cursor>);
-    fn get_mouse_position(&self) -> Vec2i32;
+    fn mouse_position(&self) -> Vec2i32;
 
-    fn get_monitor_count(&self) -> usize;
-    fn get_monitor(&self, index: usize) -> Monitor;
+    fn monitor_count(&self) -> usize;
+    fn monitor(&self, index: usize) -> Monitor;
 }

@@ -7,6 +7,7 @@ use std::str::FromStr;
 use std::sync::{Arc, Weak};
 use std::time::Instant;
 use url::Url;
+use ze_asset_server::AssetServer;
 use ze_d3d12_backend::backend::D3D12Backend;
 use ze_d3d12_shader_compiler::D3D12ShaderCompiler;
 use ze_filesystem::mount_points::StdMountPoint;
@@ -20,6 +21,7 @@ use ze_render_graph::registry::PhysicalResourceTextureView;
 use ze_render_graph::{RenderGraph, TextureInfo};
 use ze_shader_compiler::ShaderCompiler;
 use ze_shader_system::ShaderManager;
+use ze_texture_asset::importer::TextureImporter;
 use ze_windows_platform::WindowsPlatform;
 
 pub struct EditorApplication {
@@ -40,7 +42,7 @@ pub struct EditorApplication {
 impl EditorApplication {
     pub fn new() -> Self {
         let platform = WindowsPlatform::new();
-        let jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count());
+        let jobsystem = JobSystem::new(JobSystem::cpu_thread_count());
         let filesystem = FileSystem::new();
         filesystem.mount(StdMountPoint::new(
             "main",
@@ -61,7 +63,7 @@ impl EditorApplication {
             &Url::from_str("vfs:///assets/shaders").unwrap(),
         );
 
-        let screen_0_bounds = platform.get_monitor(0).bounds;
+        let screen_0_bounds = platform.monitor(0).bounds;
         let main_window = platform
             .create_window(
                 "ZinoEngine Editor",
@@ -107,8 +109,23 @@ impl EditorApplication {
         let mut previous = Instant::now();
 
         let mut main_registry = ze_render_graph::registry::PhysicalResourceRegistry::new();
-        let mut asset_explorer =
-            AssetExplorer::new(self.icon_manager.clone(), self.filesystem.clone());
+
+        let asset_server = Arc::new(
+            AssetServer::new(
+                self.filesystem.clone(),
+                vec![Url::from_str("vfs://main/assets").unwrap()],
+                Url::from_str("vfs://main/asset-cache").unwrap(),
+            )
+            .unwrap(),
+        );
+
+        asset_server.add_importer(&["png"], TextureImporter::default());
+
+        let mut asset_explorer = AssetExplorer::new(
+            asset_server.clone(),
+            self.icon_manager.clone(),
+            self.filesystem.clone(),
+        );
 
         while running {
             let delta_time = previous.elapsed().as_secs_f32();
@@ -136,17 +153,17 @@ impl EditorApplication {
 
             self.imgui.begin_frame(
                 delta_time,
-                self.platform.get_mouse_position(),
+                self.platform.mouse_position(),
                 &*self.main_window,
             );
 
             self.imgui
-                .dock_space_over_viewport(self.imgui.get_main_viewport());
+                .dock_space_over_viewport(self.imgui.main_viewport());
 
             if self.imgui.begin_main_menu_bar() {
                 self.imgui.text(&format!(
                     "{} | FPS: {}",
-                    self.backend.get_name(),
+                    self.backend.name(),
                     (1.0 / delta_time) as u32
                 ));
                 self.imgui.end_main_menu_bar();
@@ -159,11 +176,11 @@ impl EditorApplication {
             // Render
 
             let swapchain = self.main_window_swapchain.as_ref().unwrap();
-            let backbuffer_index = self.device.get_swapchain_backbuffer_index(swapchain);
+            let backbuffer_index = self.device.swapchain_backbuffer_index(swapchain);
 
             let backbuffer = self
                 .device
-                .get_swapchain_backbuffer(swapchain, backbuffer_index)
+                .swapchain_backbuffer(swapchain, backbuffer_index)
                 .unwrap();
 
             main_registry.insert_or_update_existing_texture(
@@ -191,7 +208,7 @@ impl EditorApplication {
                 },
                 |_, cmd_list| {
                     self.imgui
-                        .draw_viewport(cmd_list, self.imgui.get_main_viewport());
+                        .draw_viewport(cmd_list, self.imgui.main_viewport());
                 },
             );
 
@@ -221,27 +238,27 @@ impl EditorApplication {
             self.device
                 .create_swapchain(
                     &SwapChainDesc {
-                        width: self.main_window.get_width(),
-                        height: self.main_window.get_height(),
+                        width: self.main_window.width(),
+                        height: self.main_window.height(),
                         format: PixelFormat::R8G8B8A8Unorm,
                         sample_desc: Default::default(),
                         usage_flags: TextureUsageFlags::from_flag(
                             TextureUsageFlagBits::RenderTarget,
                         ),
-                        window_handle: self.main_window.get_handle(),
+                        window_handle: self.main_window.handle(),
                     },
                     old_swapchain,
                 )
                 .expect("Failed to create editor main window swapchain"),
         );
 
-        for i in 0..self.device.get_swapchain_backbuffer_count(&swapchain) {
+        for i in 0..self.device.swapchain_backbuffer_count(&swapchain) {
             self.main_window_swapchain_rtvs.push(Arc::new(
                 self.device
                     .create_render_target_view(&RenderTargetViewDesc {
                         resource: self
                             .device
-                            .get_swapchain_backbuffer(&swapchain, i as u32)
+                            .swapchain_backbuffer(&swapchain, i as u32)
                             .unwrap(),
                         format: PixelFormat::R8G8B8A8Unorm,
                         ty: RenderTargetViewType::Texture2D(Texture2DRTV { mip_level: 0 }),

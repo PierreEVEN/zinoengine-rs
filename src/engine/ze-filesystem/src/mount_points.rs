@@ -1,12 +1,12 @@
 ﻿use crate::{
-    make_url_for_zefs, DirEntry, DirEntryType, FileSystemError, IterDirFlagBits, IterDirFlags,
-    MountPoint, WatchEvent,
+    make_url_for_zefs, DirEntry, DirEntryType, Error, IterDirFlagBits, IterDirFlags, MountPoint,
+    WatchEvent,
 };
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::fs::{read_dir, File};
-use std::io::{Error, ErrorKind, Read};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::mpsc::channel;
@@ -15,20 +15,20 @@ use std::thread;
 use std::time::Duration;
 use url::Url;
 
-impl From<Error> for FileSystemError {
-    fn from(err: Error) -> Self {
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
         match err.kind() {
-            ErrorKind::NotFound => FileSystemError::NotFound,
-            ErrorKind::PermissionDenied => FileSystemError::PermissionDenied,
+            ErrorKind::NotFound => Error::NotFound,
+            ErrorKind::PermissionDenied => Error::PermissionDenied,
             _ => panic!("Cannot convert {:?} error kind", err.kind()),
         }
     }
 }
 
-impl From<notify::Error> for FileSystemError {
+impl From<notify::Error> for Error {
     fn from(err: notify::Error) -> Self {
         match err {
-            notify::Error::PathNotFound => FileSystemError::NotFound,
+            notify::Error::PathNotFound => Error::NotFound,
             _ => panic!("Cannot convert {:?} error kind", err),
         }
     }
@@ -99,17 +99,25 @@ impl StdMountPoint {
         path
     }
 
-    fn get_path(&self, path: &Url) -> PathBuf {
+    fn to_fs_path(&self, path: &Url) -> PathBuf {
         // Because we use long paths we can't pass to std::fs functions any forward slashes
+        // Only for Windows
+        #[cfg(windows)]
         let path = path.path().replace('/', "\\");
+
         let path = format!("{}{}", self.root.to_string_lossy(), path);
         PathBuf::from_str(&path).unwrap()
     }
 }
 
 impl MountPoint for StdMountPoint {
-    fn read(&self, path: &Url) -> Result<Box<dyn Read>, FileSystemError> {
-        let file = File::open(self.get_path(path))?;
+    fn read(&self, path: &Url) -> Result<Box<dyn Read>, Error> {
+        let file = File::open(self.to_fs_path(path))?;
+        Ok(Box::new(file))
+    }
+
+    fn write(&self, path: &Url) -> Result<Box<dyn Write>, Error> {
+        let file = File::create(self.to_fs_path(path))?;
         Ok(Box::new(file))
     }
 
@@ -118,8 +126,8 @@ impl MountPoint for StdMountPoint {
         path: &Url,
         flags: IterDirFlags,
         f: &mut dyn FnMut(DirEntry),
-    ) -> Result<(), FileSystemError> {
-        let dir = read_dir(self.get_path(path))?;
+    ) -> Result<(), Error> {
+        let dir = read_dir(self.to_fs_path(path))?;
 
         for entry in dir {
             let entry = entry?;
@@ -128,7 +136,7 @@ impl MountPoint for StdMountPoint {
                 &self.root.to_string_lossy(),
                 &entry.path().clone().canonicalize().unwrap(),
             );
-            let path = make_url_for_zefs(self.get_alias(), &path).unwrap();
+            let path = make_url_for_zefs(self.alias(), &path).unwrap();
 
             let file_type = entry.file_type().unwrap();
             let entry = DirEntry {
@@ -153,8 +161,8 @@ impl MountPoint for StdMountPoint {
         &self,
         path: &Url,
         f: &Arc<dyn Fn(WatchEvent) + Send + Sync + 'static>,
-    ) -> Result<(), FileSystemError> {
-        let path = self.get_path(path).canonicalize().unwrap();
+    ) -> Result<(), Error> {
+        let path = self.to_fs_path(path).canonicalize().unwrap();
         self.watcher
             .lock()
             .watch(path.clone(), RecursiveMode::NonRecursive)?;
@@ -162,7 +170,11 @@ impl MountPoint for StdMountPoint {
         Ok(())
     }
 
-    fn get_alias(&self) -> &str {
+    fn alias(&self) -> &str {
         &self.alias
+    }
+
+    fn to_underlying_path(&self, url: &Url) -> Result<PathBuf, Error> {
+        Ok(self.to_fs_path(url))
     }
 }

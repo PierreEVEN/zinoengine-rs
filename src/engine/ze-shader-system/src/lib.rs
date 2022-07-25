@@ -60,7 +60,7 @@ impl Shader {
         Self { ty, name, passes }
     }
 
-    fn get_pass_index(&self, name: &str) -> Option<usize> {
+    fn pass_index(&self, name: &str) -> Option<usize> {
         for (idx, pass) in self.passes.iter().enumerate() {
             if pass.name == name {
                 return Some(idx);
@@ -78,7 +78,7 @@ pub struct ShaderModules {
 }
 
 impl ShaderModules {
-    pub fn get_pipeline_stages(&self) -> Vec<PipelineShaderStage> {
+    pub fn pipeline_stages(&self) -> Vec<PipelineShaderStage> {
         let mut stages = Vec::with_capacity(self.stages.len());
         for stage in &self.stages {
             stages.push(PipelineShaderStage {
@@ -283,7 +283,7 @@ impl ShaderManager {
                 Some(name) => name,
             };
 
-            if let Some(pass_idx) = shader.get_pass_index(pass) {
+            if let Some(pass_idx) = shader.pass_index(pass) {
                 let pass = &shader.passes[pass_idx];
                 // First search on the cache
                 let mut id = DefaultHasher::new();

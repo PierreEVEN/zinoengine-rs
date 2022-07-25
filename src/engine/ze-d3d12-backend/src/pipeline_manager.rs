@@ -103,7 +103,7 @@ pub struct PipelineManager {
 }
 
 impl PipelineManager {
-    pub fn get_graphics_pipeline(
+    pub fn get_or_create_graphics_pipeline(
         &self,
         device: &ID3D12Device,
         desc: &D3D12_GRAPHICS_PIPELINE_STATE_DESC,

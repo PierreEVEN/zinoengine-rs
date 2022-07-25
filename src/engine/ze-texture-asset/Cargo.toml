@@ -6,5 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ze-gfx = { version = "0.1.0", path = "../ze-gfx" }
 ze-asset-system = { version = "0.1.0", path = "../ze-asset-system" }
 url = "2.2.2"
+uuid = { version = "1.1.2", features = [ "v4" ] }
+serde = "1.0.140"
+serde_derive = "1.0.140"
+bincode = { version = "2.0.0-rc.1", features = [ "serde" ] }

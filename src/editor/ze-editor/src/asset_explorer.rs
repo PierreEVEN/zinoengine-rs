@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::str::FromStr;
 use std::sync::Arc;
 use url::Url;
+use ze_asset_server::AssetServer;
 use ze_filesystem::{DirEntryType, FileSystem, IterDirFlags};
 use ze_imgui::ze_imgui_sys::*;
 use ze_imgui::*;
@@ -12,6 +13,7 @@ use ze_platform::MouseButton;
 pub const ASSET_EXPLORER_ID: &str = "Asset Explorer";
 
 pub struct AssetExplorer {
+    asset_server: Arc<AssetServer>,
     filesystem: Arc<FileSystem>,
     current_directory: Url,
     directory_icon: Option<Arc<Icon>>,
@@ -19,12 +21,17 @@ pub struct AssetExplorer {
 }
 
 impl AssetExplorer {
-    pub fn new(icon_manager: Arc<IconManager>, filesystem: Arc<FileSystem>) -> Self {
+    pub fn new(
+        asset_server: Arc<AssetServer>,
+        icon_manager: Arc<IconManager>,
+        filesystem: Arc<FileSystem>,
+    ) -> Self {
         Self {
+            asset_server,
             filesystem,
             current_directory: Url::from_str("vfs://main/assets").unwrap(),
-            directory_icon: icon_manager.get_icon("icons8-folder-64"),
-            file_icon: icon_manager.get_icon("icons8-file-64"),
+            directory_icon: icon_manager.icon("icons8-folder-64"),
+            file_icon: icon_manager.icon("icons8-file-64"),
         }
     }
 
@@ -38,7 +45,7 @@ impl AssetExplorer {
             "MainTable",
             2,
             make_bitflags! { TableFlagBits::{Resizable | NoBordersInBodyUntilResize} },
-            imgui.get_available_content_region(),
+            imgui.available_content_region(),
         ) {
             imgui.table_setup_column(
                 "Directory Hierarchy",
@@ -62,7 +69,7 @@ impl AssetExplorer {
     fn draw_directory_list(&mut self, imgui: &mut Context) {
         imgui.begin_child(
             "Directory List",
-            imgui.get_available_content_region(),
+            imgui.available_content_region(),
             false,
             WindowFlags::empty(),
         );
@@ -71,7 +78,7 @@ impl AssetExplorer {
         imgui.dummy(ImVec2::new(10.0, 0.0));
         imgui.same_line(0.0, -1.0);
 
-        let column_count = (imgui.get_available_content_region().x / 90.0).clamp(1.0, 15.0);
+        let column_count = (imgui.available_content_region().x / 90.0).clamp(1.0, 15.0);
         imgui.begin_table(
             "DirectoryListTable",
             column_count as u32,
@@ -85,7 +92,7 @@ impl AssetExplorer {
         self.filesystem
             .iter_dir(&self.current_directory, IterDirFlags::empty(), |entry| {
                 if entry.ty == DirEntryType::File {
-                    let _file_name_and_extension = entry
+                    let file_name_and_extension = entry
                         .url
                         .path_segments()
                         .unwrap()
@@ -93,7 +100,12 @@ impl AssetExplorer {
                         .unwrap()
                         .split('.');
 
-                    // TODO: Check if this source format is supported
+                    if !self
+                        .asset_server
+                        .is_extension_importable(file_name_and_extension.last().unwrap())
+                    {
+                        return;
+                    }
                 }
                 entries.push(entry);
             })
@@ -134,10 +146,10 @@ impl AssetExplorer {
                     self.current_directory = entry.url.clone();
                 }
 
-                let cursor_screen_pos = imgui.get_cursor_screen_pos();
+                let cursor_screen_pos = imgui.cursor_screen_pos();
                 imgui.window_add_rect_filled(
                     cursor_screen_pos,
-                    cursor_screen_pos + imgui.get_available_content_region(),
+                    cursor_screen_pos + imgui.available_content_region(),
                     unsafe { (*igGetStyle()).Colors[ImGuiCol__ImGuiCol_HeaderHovered as usize] },
                 );
 
@@ -174,7 +186,7 @@ impl AssetExplorer {
     fn draw_directory_hierarchy(&mut self, imgui: &mut Context) {
         imgui.begin_child(
             "Directory Hierarchy",
-            imgui.get_available_content_region(),
+            imgui.available_content_region(),
             false,
             WindowFlags::empty(),
         );

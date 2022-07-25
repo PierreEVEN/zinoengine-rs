@@ -162,21 +162,21 @@ impl WindowsPlatform {
                     message_queue.push_back(Message::MouseButtonDown(
                         window.clone(),
                         MouseButton::Left,
-                        self.get_mouse_position(),
+                        self.mouse_position(),
                     ));
                 }
                 WM_MBUTTONDOWN => {
                     message_queue.push_back(Message::MouseButtonDown(
                         window.clone(),
                         MouseButton::Middle,
-                        self.get_mouse_position(),
+                        self.mouse_position(),
                     ));
                 }
                 WM_RBUTTONDOWN => {
                     message_queue.push_back(Message::MouseButtonDown(
                         window.clone(),
                         MouseButton::Right,
-                        self.get_mouse_position(),
+                        self.mouse_position(),
                     ));
                 }
 
@@ -184,21 +184,21 @@ impl WindowsPlatform {
                     message_queue.push_back(Message::MouseButtonUp(
                         window.clone(),
                         MouseButton::Left,
-                        self.get_mouse_position(),
+                        self.mouse_position(),
                     ));
                 }
                 WM_MBUTTONUP => {
                     message_queue.push_back(Message::MouseButtonUp(
                         window.clone(),
                         MouseButton::Middle,
-                        self.get_mouse_position(),
+                        self.mouse_position(),
                     ));
                 }
                 WM_RBUTTONUP => {
                     message_queue.push_back(Message::MouseButtonUp(
                         window.clone(),
                         MouseButton::Right,
-                        self.get_mouse_position(),
+                        self.mouse_position(),
                     ));
                 }
 
@@ -206,28 +206,28 @@ impl WindowsPlatform {
                     message_queue.push_back(Message::MouseButtonDoubleClick(
                         window.clone(),
                         MouseButton::Left,
-                        self.get_mouse_position(),
+                        self.mouse_position(),
                     ));
                 }
                 WM_MBUTTONDBLCLK => {
                     message_queue.push_back(Message::MouseButtonDoubleClick(
                         window.clone(),
                         MouseButton::Middle,
-                        self.get_mouse_position(),
+                        self.mouse_position(),
                     ));
                 }
                 WM_RBUTTONDBLCLK => {
                     message_queue.push_back(Message::MouseButtonDoubleClick(
                         window.clone(),
                         MouseButton::Right,
-                        self.get_mouse_position(),
+                        self.mouse_position(),
                     ));
                 }
                 WM_MOUSEWHEEL => {
                     message_queue.push_back(Message::MouseWheel(
                         window.clone(),
                         (ze_win_hiword!(wparam.0) as c_short as f32) / (WHEEL_DELTA as f32),
-                        self.get_mouse_position(),
+                        self.mouse_position(),
                     ));
                 }
                 _ => (),
@@ -429,17 +429,17 @@ impl Platform for WindowsPlatform {
         }
     }
 
-    fn get_mouse_position(&self) -> Vec2i32 {
+    fn mouse_position(&self) -> Vec2i32 {
         let mut pos = POINT::default();
         unsafe { GetCursorPos(&mut pos) };
         Vec2i32::new(pos.x, pos.y)
     }
 
-    fn get_monitor_count(&self) -> usize {
+    fn monitor_count(&self) -> usize {
         self.monitors.lock().len()
     }
 
-    fn get_monitor(&self, index: usize) -> Monitor {
+    fn monitor(&self, index: usize) -> Monitor {
         self.monitors.lock()[index]
     }
 }

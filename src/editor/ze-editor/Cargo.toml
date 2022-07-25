@@ -12,7 +12,9 @@ name = "ze-editor"
 [dependencies]
 ze-core = { version = "0.1.0", path = "../../engine/ze-core" }
 ze-platform = { version = "0.1.0", path = "../../engine/ze-platform" }
+ze-asset-server = { version = "0.1.0", path = "../../engine/ze-asset-server" }
 ze-asset-system = { version = "0.1.0", path = "../../engine/ze-asset-system" }
+ze-texture-asset = { version = "0.1.0", path = "../../engine/ze-texture-asset" }
 ze-windows-platform = { version = "0.1.0", path = "../../engine/ze-windows-platform" }
 ze-gfx = { version = "0.1.0", path = "../../engine/ze-gfx" }
 ze-d3d12-backend = { version = "0.1.0", path = "../../engine/ze-d3d12-backend" }

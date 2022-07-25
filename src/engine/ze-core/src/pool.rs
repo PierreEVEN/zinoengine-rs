@@ -29,7 +29,7 @@ impl<T, const PAGE_SIZE_IN_ELEMENTS: usize, const DISABLE_SLOT_AFTER_OVERFLOW: b
     }
 
     fn insert(&mut self, index: u32, object: T) -> Handle<T> {
-        let real_index = self.get_real_index(index);
+        let real_index = self.real_index(index);
 
         if let Slot::Free(current_generation) = self.memory[real_index] {
             self.memory[real_index] = Slot::Alive((current_generation, object));
@@ -46,7 +46,7 @@ impl<T, const PAGE_SIZE_IN_ELEMENTS: usize, const DISABLE_SLOT_AFTER_OVERFLOW: b
     /// Remove an object from the pool
     /// Returns `true` if the slot has been freed and `false` if it didn't or was marked dead
     fn remove(&mut self, handle: &Handle<T>) -> SlotRemoveResult {
-        let real_index = self.get_real_index(handle.index);
+        let real_index = self.real_index(handle.index);
         let slot = &mut self.memory[real_index];
         if let Slot::Alive((generation, _)) = slot {
             if handle.generation == *generation {
@@ -68,18 +68,18 @@ impl<T, const PAGE_SIZE_IN_ELEMENTS: usize, const DISABLE_SLOT_AFTER_OVERFLOW: b
     }
 
     fn at(&self, index: u32) -> &Slot<T> {
-        &self.memory[self.get_real_index(index)]
+        &self.memory[self.real_index(index)]
     }
 
     fn at_mut(&mut self, index: u32) -> &mut Slot<T> {
-        &mut self.memory[self.get_real_index(index)]
+        &mut self.memory[self.real_index(index)]
     }
 
     fn iter_mut(&mut self) -> IterMut<'_, Slot<T>> {
         self.memory.iter_mut()
     }
 
-    fn get_real_index(&self, index: u32) -> usize {
+    fn real_index(&self, index: u32) -> usize {
         (index as usize) - (self.index * PAGE_SIZE_IN_ELEMENTS)
     }
 }

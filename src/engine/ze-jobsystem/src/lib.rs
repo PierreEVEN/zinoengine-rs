@@ -124,12 +124,9 @@ impl Job {
         let jobsystem = unsafe { self.jobsystem.as_mut().unwrap() };
         jobsystem
             .shared_worker_data
-            .get_injector()
+            .injector()
             .push(JobHandle::from(self));
-        jobsystem
-            .shared_worker_data
-            .get_sleep_condvar()
-            .notify_all();
+        jobsystem.shared_worker_data.sleep_condvar().notify_all();
     }
 
     /// Add a continuation job that will be scheduled when this job finishes
@@ -197,19 +194,19 @@ impl SharedWorkerData {
         }
     }
 
-    fn get_injector(&self) -> &Injector<JobHandle> {
+    fn injector(&self) -> &Injector<JobHandle> {
         &self.injector
     }
 
-    fn get_stealers(&self) -> &Vec<Stealer<JobHandle>> {
+    fn stealers(&self) -> &Vec<Stealer<JobHandle>> {
         &self.stealers
     }
 
-    fn get_sleep_condvar(&self) -> &Condvar {
+    fn sleep_condvar(&self) -> &Condvar {
         &self.sleep_condvar
     }
 
-    fn get_sleep_mutex(&self) -> &Mutex<()> {
+    fn sleep_mutex(&self) -> &Mutex<()> {
         &self.sleep_mutex
     }
 }
@@ -237,11 +234,11 @@ impl WorkerThread {
                 iter::repeat_with(|| {
                     let shared_worker_data = shared_worker_data.as_ref();
                     shared_worker_data
-                        .get_injector()
+                        .injector()
                         .steal_batch_and_pop(&job_queue)
                         .or_else(|| {
                             shared_worker_data
-                                .get_stealers()
+                                .stealers()
                                 .iter()
                                 .map(|stealer| stealer.steal())
                                 .collect()
@@ -253,8 +250,8 @@ impl WorkerThread {
                 Job::execute(&mut job);
             } else {
                 // Nothing :( so sleep until another job is here!
-                let mut guard = shared_worker_data.get_sleep_mutex().lock();
-                shared_worker_data.get_sleep_condvar().wait(&mut guard);
+                let mut guard = shared_worker_data.sleep_mutex().lock();
+                shared_worker_data.sleep_condvar().wait(&mut guard);
             }
         }
     }
@@ -355,11 +352,11 @@ impl JobSystem {
         job
     }
 
-    pub fn get_job_allocator(&mut self) -> &mut Allocator<Job> {
+    pub fn job_allocator(&mut self) -> &mut Allocator<Job> {
         &mut self.allocator
     }
 
-    pub fn get_cpu_thread_count() -> usize {
+    pub fn cpu_thread_count() -> usize {
         num_cpus::get()
     }
 }

@@ -31,7 +31,7 @@ impl IconManager {
         }
     }
 
-    pub fn get_icon(&self, name: &str) -> Option<Arc<Icon>> {
+    pub fn icon(&self, name: &str) -> Option<Arc<Icon>> {
         let icons = self.icons.read();
         if let Some(icon) = icons.get(name) {
             Some(icon.clone())

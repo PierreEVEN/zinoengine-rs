@@ -53,9 +53,8 @@ impl ViewportRendererData {
         if let (Some(vertex_buffer), Some(index_buffer)) = (&self.vertex_buffer, &self.index_buffer)
         {
             let mut vertex_ptr =
-                device.get_buffer_mapped_ptr(vertex_buffer).unwrap() as *mut ImDrawVert;
-            let mut index_ptr =
-                device.get_buffer_mapped_ptr(index_buffer).unwrap() as *mut ImDrawIdx;
+                device.buffer_mapped_ptr(vertex_buffer).unwrap() as *mut ImDrawVert;
+            let mut index_ptr = device.buffer_mapped_ptr(index_buffer).unwrap() as *mut ImDrawIdx;
 
             let draw_lists = unsafe {
                 slice::from_raw_parts(draw_data.CmdLists, draw_data.CmdListsCount as usize)

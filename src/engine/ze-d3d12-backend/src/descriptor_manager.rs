@@ -137,11 +137,11 @@ impl DescriptorManager {
         }
     }
 
-    pub fn get_cbv_srv_uav_heap(&self) -> &ID3D12DescriptorHeap {
+    pub fn cbv_srv_uav_heap(&self) -> &ID3D12DescriptorHeap {
         &self.cbv_srv_uav_heap.heap
     }
 
-    pub fn get_sampler_heap(&self) -> &ID3D12DescriptorHeap {
+    pub fn sampler_heap(&self) -> &ID3D12DescriptorHeap {
         &self.sampler_heap.heap
     }
 
@@ -157,19 +157,19 @@ impl DescriptorManager {
         self.sampler_heap.free(handles);
     }
 
-    pub fn get_cbv_srv_uav_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
+    pub fn allocate_cbv_srv_uav_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
         self.cbv_srv_uav_heap.allocate()
     }
 
-    pub fn get_sampler_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
+    pub fn allocate_sampler_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
         self.sampler_heap.allocate()
     }
 
-    pub fn get_rtv_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
+    pub fn allocate_rtv_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
         self.rtv_heap.allocate()
     }
 
-    pub fn get_dsv_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
+    pub fn allocate_dsv_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
         self.dsv_heap.allocate()
     }
 }

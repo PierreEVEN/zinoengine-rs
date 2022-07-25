@@ -6,7 +6,7 @@ use std::time::Duration;
 
 #[test]
 fn spawn_one_job() {
-    let jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count() - 1);
+    let jobsystem = JobSystem::new(JobSystem::cpu_thread_count() - 1);
     let simple_bool = Arc::new(AtomicBool::new(false));
     {
         let simple_bool = simple_bool.clone();
@@ -21,7 +21,7 @@ fn spawn_one_job() {
 
 #[test]
 fn spawn_one_job_five_childs() {
-    let jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count() - 1);
+    let jobsystem = JobSystem::new(JobSystem::cpu_thread_count() - 1);
     let counter = Arc::new(AtomicU32::new(0));
     {
         let counter = counter.clone();
@@ -44,7 +44,7 @@ fn spawn_one_job_five_childs() {
 
 #[test]
 fn spawn_three_jobs_one_continuation_per_job() {
-    let jobsystem = JobSystem::new(JobSystem::get_cpu_thread_count() - 1);
+    let jobsystem = JobSystem::new(JobSystem::cpu_thread_count() - 1);
     let counter = Arc::new(AtomicU32::new(0));
 
     for _ in 0..3 {
