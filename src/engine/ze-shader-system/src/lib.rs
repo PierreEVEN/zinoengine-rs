@@ -17,7 +17,7 @@ use ze_jobsystem::JobSystem;
 use ze_shader_compiler::{ShaderCompiler, ShaderCompilerInput};
 
 enum ShaderStageSourceData {
-    Bytecode(Vec<u8>),
+    _Bytecode(Vec<u8>),
     Hlsl(String),
 }
 
@@ -46,7 +46,7 @@ impl ShaderPass {
 #[derive(Eq, PartialEq, Debug)]
 enum ShaderType {
     Zeshader,
-    ZeshaderBin,
+    _ZeshaderBin,
 }
 
 pub struct Shader {

@@ -1,4 +1,5 @@
 ﻿use crate::asset_explorer::AssetExplorer;
+use crate::console::Console;
 use crate::icon_manager::IconManager;
 use enumflags2::make_bitflags;
 use std::env;
@@ -7,7 +8,9 @@ use std::str::FromStr;
 use std::sync::{Arc, Weak};
 use std::time::Instant;
 use url::Url;
-use ze_asset_server::AssetServer;
+use ze_asset_server::{AssetServer, AssetServerProvider};
+use ze_asset_system::AssetManager;
+use ze_core::type_uuid::TypeUuid;
 use ze_d3d12_backend::backend::D3D12Backend;
 use ze_d3d12_shader_compiler::D3D12ShaderCompiler;
 use ze_filesystem::mount_points::StdMountPoint;
@@ -16,22 +19,23 @@ use ze_gfx::backend::*;
 use ze_gfx::PixelFormat;
 use ze_imgui::Context;
 use ze_jobsystem::JobSystem;
-use ze_platform::{Message, Platform, Window, WindowFlagBits, WindowFlags};
+use ze_platform::{Message, Platform, Window, WindowFlagBits};
 use ze_render_graph::registry::PhysicalResourceTextureView;
 use ze_render_graph::{RenderGraph, TextureInfo};
 use ze_shader_compiler::ShaderCompiler;
 use ze_shader_system::ShaderManager;
 use ze_texture_asset::importer::TextureImporter;
+use ze_texture_asset::loader::TextureLoader;
 use ze_windows_platform::WindowsPlatform;
 
 pub struct EditorApplication {
     platform: Arc<dyn Platform>,
     backend: Arc<dyn Backend>,
     device: Arc<dyn Device>,
-    jobsystem: Arc<JobSystem>,
+    _jobsystem: Arc<JobSystem>,
     filesystem: Arc<FileSystem>,
-    shader_compiler: Arc<dyn ShaderCompiler>,
-    shader_manager: Arc<ShaderManager>,
+    _shader_compiler: Arc<dyn ShaderCompiler>,
+    _shader_manager: Arc<ShaderManager>,
     main_window: Arc<dyn Window>,
     main_window_swapchain: Option<Arc<SwapChain>>,
     main_window_swapchain_rtvs: Vec<Arc<RenderTargetView>>,
@@ -86,10 +90,10 @@ impl EditorApplication {
             platform,
             backend,
             device: device.clone(),
-            jobsystem,
+            _jobsystem: jobsystem,
             filesystem: filesystem.clone(),
-            shader_compiler,
-            shader_manager,
+            _shader_compiler: shader_compiler,
+            _shader_manager: shader_manager,
             main_window,
             main_window_swapchain: None,
             main_window_swapchain_rtvs: vec![],
@@ -121,11 +125,27 @@ impl EditorApplication {
 
         asset_server.add_importer(&["png"], TextureImporter::default());
 
+        let asset_manager = Arc::new(AssetManager::default());
+        asset_manager.add_provider(AssetServerProvider::new(asset_server.clone()), 1);
+        asset_manager.add_loader(
+            ze_texture_asset::Texture::type_uuid(),
+            TextureLoader::new(self.device.clone()),
+        );
+
+        let asset_editor_manager = Arc::new(ze_asset_editor::AssetEditorManager::default());
+        asset_editor_manager.add_editor_factory(
+            ze_texture_asset::Texture::type_uuid(),
+            ze_texture_editor::EditorFactory::new(asset_manager.clone()),
+        );
+
         let mut asset_explorer = AssetExplorer::new(
             asset_server.clone(),
             self.icon_manager.clone(),
             self.filesystem.clone(),
+            asset_editor_manager.clone(),
         );
+
+        let console = Console::new();
 
         while running {
             let delta_time = previous.elapsed().as_secs_f32();
@@ -141,7 +161,7 @@ impl EditorApplication {
                     }
                     Message::WindowResized(event_window, _, _) => {
                         if Weak::ptr_eq(&event_window, &Arc::downgrade(&self.main_window)) {
-                            main_registry.remove_resource("backbuffer");
+                            let _ = main_registry.remove_resource("backbuffer");
                             self.update_main_window_swapchain();
                         }
                     }
@@ -157,7 +177,8 @@ impl EditorApplication {
                 &*self.main_window,
             );
 
-            self.imgui
+            let main_dockspace_id = self
+                .imgui
                 .dock_space_over_viewport(self.imgui.main_viewport());
 
             if self.imgui.begin_main_menu_bar() {
@@ -170,7 +191,8 @@ impl EditorApplication {
             }
 
             asset_explorer.draw(&mut self.imgui);
-
+            asset_editor_manager.draw_editors(&mut self.imgui, main_dockspace_id);
+            console.draw(&mut self.imgui);
             self.imgui.end_frame();
 
             // Render

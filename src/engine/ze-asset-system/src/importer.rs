@@ -8,16 +8,25 @@ use ze_filesystem::FileSystem;
 
 pub struct ImportedAsset {
     uuid: Uuid,
+    type_uuid: Uuid,
     data: Vec<u8>,
 }
 
 impl ImportedAsset {
-    pub fn new(uuid: Uuid, data: Vec<u8>) -> Self {
-        Self { uuid, data }
+    pub fn new(uuid: Uuid, type_uuid: Uuid, data: Vec<u8>) -> Self {
+        Self {
+            uuid,
+            type_uuid,
+            data,
+        }
     }
 
     pub fn uuid(&self) -> &Uuid {
         &self.uuid
+    }
+
+    pub fn type_uuid(&self) -> Uuid {
+        self.type_uuid
     }
 
     pub fn data(&self) -> &Vec<u8> {
@@ -48,6 +57,7 @@ pub enum Error {
     CannotWriteMetadata(ze_filesystem::Error),
     IoError(io::Error),
     InvalidYaml(serde_yaml::Error),
+    InvalidSourceAsset,
     FailedToSerialize,
 }
 

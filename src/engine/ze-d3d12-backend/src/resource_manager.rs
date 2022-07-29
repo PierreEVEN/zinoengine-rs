@@ -4,7 +4,6 @@ use gpu_allocator::d3d12::Allocation;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use windows::Win32::Graphics::Direct3D12::ID3D12Resource;
-use ze_core::ze_info;
 
 pub struct DeferredDestructionResourceEntry {
     pub resource: SendableIUnknown<ID3D12Resource>,
@@ -41,13 +40,6 @@ impl ResourceManager {
     pub fn destroy_resources(&self) {
         let mut allocator = self.allocator.lock();
         let mut queue = self.queue.lock();
-
-        if !queue.is_empty() {
-            ze_info!(
-                "(Deferred destruction) Destroying {} resources",
-                queue.len()
-            );
-        }
 
         for entry in queue.drain(..) {
             if let Some(allocation) = entry.allocation {

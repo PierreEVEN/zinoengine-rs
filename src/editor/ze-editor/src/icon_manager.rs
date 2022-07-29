@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::sync::Arc;
 use url::Url;
-use ze_core::maths::Vec2f32;
 use ze_filesystem::FileSystem;
 use ze_gfx::backend::*;
 use ze_gfx::utils::copy_data_to_texture;

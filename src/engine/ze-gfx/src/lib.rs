@@ -6,7 +6,15 @@ pub enum PixelFormat {
     Unknown,
     B8G8R8A8UnormSrgb,
     B8G8R8A8Unorm,
+
+    R8G8B8Unorm,
     R8G8B8A8Unorm,
+}
+
+impl Default for PixelFormat {
+    fn default() -> Self {
+        Self::Unknown
+    }
 }
 
 #[derive(Copy, Clone, Debug)]

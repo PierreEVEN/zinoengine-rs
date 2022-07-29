@@ -1,12 +1,14 @@
 ﻿use crate::thread::thread_name;
 use chrono::Local;
 use lazy_static::lazy_static;
+use parking_lot::RwLock;
 use std::fmt::Arguments;
 use std::io::Write;
-use std::sync;
+use std::sync::{Arc, Weak};
 use std::{fmt, thread};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
+#[derive(Copy, Clone)]
 pub enum Severity {
     Verbose,
     Info,
@@ -27,22 +29,41 @@ impl fmt::Display for Severity {
     }
 }
 
+#[derive(Clone)]
 pub struct Message {
-    severity: Severity,
-    crate_name: String,
-    message: String,
-    time: chrono::DateTime<Local>,
-    thread: thread::ThreadId,
+    pub severity: Severity,
+    pub crate_name: String,
+    pub message: String,
+    pub time: chrono::DateTime<Local>,
+    pub thread: thread::ThreadId,
 }
 
 /// Implement a "sink". This receives log messages from the global logger and process them.
 /// E.g: print to a file
-pub trait Sink: Send {
+pub trait Sink: Send + Sync {
     fn log(&self, message: &Message);
 }
 
+enum SinkEntry {
+    Arc(Arc<dyn Sink>),
+    Weak(Weak<dyn Sink>),
+}
+
+impl SinkEntry {
+    fn log(&self, message: &Message) {
+        match self {
+            SinkEntry::Arc(arc) => arc.log(message),
+            SinkEntry::Weak(weak) => {
+                if let Some(arc) = weak.upgrade() {
+                    arc.log(message);
+                }
+            }
+        }
+    }
+}
+
 lazy_static! {
-    static ref SINKS: sync::Mutex<Vec<Box<dyn Sink>>> = sync::Mutex::new(Vec::new());
+    static ref SINKS: RwLock<Vec<SinkEntry>> = Default::default();
 }
 
 #[doc(hidden)]
@@ -56,7 +77,7 @@ pub fn internal_log(severity: Severity, crate_name: &str, args: Arguments) {
         thread: thread::current().id(),
     };
 
-    for sink in SINKS.lock().unwrap().iter() {
+    for sink in SINKS.read().iter() {
         sink.log(&message);
     }
 
@@ -67,16 +88,29 @@ pub fn internal_log(severity: Severity, crate_name: &str, args: Arguments) {
 
 /** Sink API */
 
-/**
- * Register a new sink
- */
-pub fn register_sink(sink: Box<dyn Sink>) {
-    SINKS.lock().unwrap().push(sink);
+pub fn register_sink(sink: Arc<dyn Sink>) {
+    SINKS.write().push(SinkEntry::Arc(sink));
+}
+
+pub fn register_sink_weak<T: Sink + 'static>(sink: Weak<T>) {
+    SINKS.write().push(SinkEntry::Weak(sink));
+}
+
+pub fn unregister_sink(sink: &Arc<dyn Sink>) {
+    let mut sinks = SINKS.write();
+    for (i, e) in sinks.iter().enumerate() {
+        if let SinkEntry::Arc(arc) = e {
+            if Arc::ptr_eq(arc, sink) {
+                sinks.remove(i);
+                break;
+            }
+        }
+    }
 }
 
 /** Default logging macros */
 #[macro_export]
-macro_rules! prism_verbose {
+macro_rules! ze_verbose {
     ($($arg:tt)*) => ({
         $crate::logger::internal_log($crate::logger::Severity::Verbose, env!("CARGO_PKG_NAME"), format_args!($($arg)*));
     })
@@ -112,8 +146,13 @@ macro_rules! ze_fatal {
 }
 
 /** Default sinks */
-#[derive(Default)]
 pub struct StdoutSink;
+
+impl StdoutSink {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {})
+    }
+}
 
 impl Sink for StdoutSink {
     fn log(&self, message: &Message) {

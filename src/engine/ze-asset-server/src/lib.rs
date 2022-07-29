@@ -4,11 +4,13 @@ use sha2::Digest;
 use sha2::Sha256;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::io::{Cursor, Read};
 use std::path::Path;
 use std::sync::Arc;
 use url::Url;
+use uuid::Uuid;
 use ze_asset_system::importer::BoxedAssetImporter;
-use ze_asset_system::ASSET_METADATA_EXTENSION;
+use ze_asset_system::{AssetProvider, LoadError, ASSET_METADATA_EXTENSION};
 use ze_core::{ze_error, ze_info};
 use ze_filesystem::{FileSystem, IterDirFlagBits, IterDirFlags};
 
@@ -16,6 +18,7 @@ use ze_filesystem::{FileSystem, IterDirFlagBits, IterDirFlags};
 pub enum Error {
     CannotCreateOrOpenSourceDb,
     CannotCreateOrOpenAssetDb,
+    UnknownAsset,
 }
 
 impl Display for Error {
@@ -128,6 +131,21 @@ impl AssetServer {
         self.scan_asset_directories();
     }
 
+    pub fn get_asset_data(&self, uuid: Uuid) -> Result<(Uuid, Vec<u8>), Error> {
+        let data = match self.asset_db.get(uuid) {
+            Ok(data) => data.unwrap(),
+            Err(_) => return Err(Error::UnknownAsset),
+        };
+
+        let type_uuid_bytes = match self.asset_db.get(format!("{}_type_uuid", uuid.as_u128())) {
+            Ok(data) => data.unwrap(),
+            Err(_) => return Err(Error::UnknownAsset),
+        };
+
+        let type_uuid = Uuid::from_slice(&type_uuid_bytes).unwrap();
+        Ok((type_uuid, data.to_vec()))
+    }
+
     pub fn is_extension_importable(&self, extension: &str) -> bool {
         self.importers.read().get(extension).is_some()
     }
@@ -191,6 +209,13 @@ impl AssetServer {
                     self.asset_db
                         .insert(asset.uuid(), asset.data().clone())
                         .expect("Failed to store asset to asset database correctly!");
+
+                    self.asset_db
+                        .insert(
+                            format!("{}_type_uuid", asset.uuid().as_u128()),
+                            asset.type_uuid().as_bytes(),
+                        )
+                        .expect("Failed to store asset to asset database correctly!");
                 }
 
                 self.source_db
@@ -207,8 +232,61 @@ impl AssetServer {
         };
     }
 
+    pub fn asset_type_uuid(&self, uuid: Uuid) -> Option<Uuid> {
+        let type_uuid_bytes = match self.asset_db.get(format!("{}_type_uuid", uuid.as_u128())) {
+            Ok(data) => data.unwrap(),
+            Err(_) => return None,
+        };
+
+        Some(Uuid::from_slice(&type_uuid_bytes).unwrap())
+    }
+
+    pub fn asset_uuid_from_url(&self, url: &Url) -> Option<Uuid> {
+        let metadata_url = {
+            let mut url = url.clone();
+            let asset_path =
+                url.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
+            let path = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
+            url.set_path(&path);
+            url
+        };
+
+        #[derive(Deserialize)]
+        struct Metadata {
+            uuid: Uuid,
+        }
+
+        if let Ok(file) = self.filesystem.read(&metadata_url) {
+            if let Ok(metadata) = serde_yaml::from_reader(file) {
+                let metadata: Metadata = metadata;
+                return Some(metadata.uuid);
+            }
+        }
+
+        None
+    }
+
     fn importer_for_extension(&self, extension: &str) -> Option<Arc<dyn BoxedAssetImporter>> {
         let importers = self.importers.read();
         importers.get(extension).cloned()
+    }
+}
+
+pub struct AssetServerProvider {
+    asset_server: Arc<AssetServer>,
+}
+
+impl AssetServerProvider {
+    pub fn new(asset_server: Arc<AssetServer>) -> Self {
+        Self { asset_server }
+    }
+}
+
+impl AssetProvider for AssetServerProvider {
+    fn load(&self, uuid: Uuid, _: &Url) -> Result<(Uuid, Box<dyn Read>), LoadError> {
+        match self.asset_server.get_asset_data(uuid) {
+            Ok(data) => Ok((data.0, Box::new(Cursor::new(data.1)))),
+            Err(_) => Err(LoadError::NotFound),
+        }
     }
 }

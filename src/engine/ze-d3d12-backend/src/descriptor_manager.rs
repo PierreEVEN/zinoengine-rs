@@ -56,7 +56,7 @@ pub struct DescriptorManager {
     cbv_srv_uav_heap: DescriptorHeap,
     sampler_heap: DescriptorHeap,
     rtv_heap: DescriptorHeap,
-    dsv_heap: DescriptorHeap,
+    _dsv_heap: DescriptorHeap,
 }
 
 impl DescriptorManager {
@@ -133,7 +133,7 @@ impl DescriptorManager {
             cbv_srv_uav_heap: DescriptorHeap::new(cbv_srv_uav_heap, cbv_srv_uav_increment_size),
             sampler_heap: DescriptorHeap::new(sampler_heap, sampler_increment_size),
             rtv_heap: DescriptorHeap::new(rtv_heap, rtv_increment_size),
-            dsv_heap: DescriptorHeap::new(dsv_heap, dsv_increment_size),
+            _dsv_heap: DescriptorHeap::new(dsv_heap, dsv_increment_size),
         }
     }
 
@@ -169,7 +169,7 @@ impl DescriptorManager {
         self.rtv_heap.allocate()
     }
 
-    pub fn allocate_dsv_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
-        self.dsv_heap.allocate()
+    pub fn _allocate_dsv_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
+        self._dsv_heap.allocate()
     }
 }

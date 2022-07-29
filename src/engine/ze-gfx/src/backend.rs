@@ -516,7 +516,7 @@ impl Sampler {
     }
 }
 
-pub trait ShaderVisibleResource: Any + Send {
+pub trait ShaderVisibleResource: Any + Send + Sync {
     fn descriptor_index(&self) -> u32;
 }
 

@@ -2,6 +2,7 @@
 .vscode
 target/
 build/
+asset-cache/
 *.dll
 *.exe
 *.o

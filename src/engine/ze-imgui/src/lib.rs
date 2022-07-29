@@ -708,7 +708,7 @@ impl Context {
         unsafe { igPushStyleVar_Float(var as i32, val) }
     }
 
-    pub fn push_style_var_Vec2f32(&mut self, var: StyleVar, val: ImVec2) {
+    pub fn push_style_var_vec2f32(&mut self, var: StyleVar, val: ImVec2) {
         unsafe { igPushStyleVar_Vec2(var as i32, val) }
     }
 
@@ -725,13 +725,13 @@ impl Context {
         unsafe { igEnd() };
     }
 
-    pub fn dock_space_over_viewport(&self, viewport: &mut ImGuiViewport) {
+    pub fn dock_space_over_viewport(&self, viewport: &mut ImGuiViewport) -> ImGuiID {
         unsafe {
             igDockSpaceOverViewport(
                 viewport,
                 ImGuiDockNodeFlags__ImGuiDockNodeFlags_None,
                 std::ptr::null(),
-            );
+            )
         }
     }
 
@@ -847,6 +847,17 @@ impl Context {
 
     pub fn same_line(&self, offset_from_x: f32, spacing: f32) {
         unsafe { igSameLine(offset_from_x, spacing) }
+    }
+
+    pub fn id_from_str(&mut self, str: &str) -> ImGuiID {
+        let str = self.str_buffer.convert(str);
+        unsafe { igGetID_Str(str) }
+    }
+
+    pub fn next_window_dock_id(&self, id: ImGuiID) {
+        unsafe {
+            igSetNextWindowDockID(id, ImGuiCond__ImGuiCond_Once);
+        }
     }
 }
 

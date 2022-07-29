@@ -15,6 +15,7 @@ pub enum PhysicalResourceTextureView {
 
 enum PhysicalResource {
     Texture(Arc<Texture>, PhysicalResourceTextureView),
+    _Buffer(),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -106,11 +107,7 @@ impl PhysicalResourceRegistry {
         Err(Error::InvalidResourceType)
     }
 
-    pub fn get_or_create_texture(
-        &mut self,
-        name: &str,
-        info: &TextureInfo,
-    ) -> PhysicalResourceHandle {
+    pub fn get_or_create_texture(&mut self, name: &str, _: &TextureInfo) -> PhysicalResourceHandle {
         if let Some(resource_handle) = self.resource_name_map.get(name) {
             return *resource_handle;
         }

@@ -43,7 +43,7 @@ struct Resource {
     name: String,
     handle: ResourceHandle,
     physical_handle: Option<PhysicalResourceHandle>,
-    pass_reads: Vec<RenderPassHandle>,
+    _pass_reads: Vec<RenderPassHandle>,
     pass_writes: Vec<RenderPassHandle>,
     data: ResourceData,
 }
@@ -54,7 +54,7 @@ impl Resource {
             name: name.to_string(),
             handle,
             physical_handle: None,
-            pass_reads: vec![],
+            _pass_reads: vec![],
             pass_writes: vec![],
             data: ResourceData::None,
         }
@@ -390,7 +390,7 @@ impl<'a> RenderGraph<'a> {
         pass: RenderPassHandle,
         stack_depth: usize,
     ) {
-        let render_pass = &self.render_passes[pass.0];
+        let _ = &self.render_passes[pass.0];
 
         // Collect pass dependencies and add them later on
         let pass_dependencies = vec![];

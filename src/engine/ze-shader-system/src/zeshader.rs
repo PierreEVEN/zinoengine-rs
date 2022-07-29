@@ -341,10 +341,6 @@ impl Parameter {
     pub fn new(ty: ParameterType, name: String) -> Self {
         Self { ty, name }
     }
-
-    pub fn is_uav(&self) -> bool {
-        matches!(self.ty, ParameterType::RWByteAddressBuffer)
-    }
 }
 
 #[cfg(test)]

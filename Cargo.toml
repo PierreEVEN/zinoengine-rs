@@ -1,2 +1,2 @@
 [workspace]
-members = ["src/editor/*", "src/engine/*", "src/tools/assets/*"]
+members = ["src/editor/*", "src/engine/*"]

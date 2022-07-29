@@ -1,0 +1,14 @@
+[package]
+name = "ze-texture-editor"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ze-imgui = { version = "0.1.0", path = "../../engine/ze-imgui" }
+ze-asset-system = { version = "0.1.0", path = "../../engine/ze-asset-system" }
+ze-texture-asset = { version = "0.1.0", path = "../../engine/ze-texture-asset" }
+ze-asset-editor = { version = "0.1.0", path = "../ze-asset-editor" }
+uuid = "1.1.2"
+url = "2.2.2"

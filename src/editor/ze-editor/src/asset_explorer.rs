@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::str::FromStr;
 use std::sync::Arc;
 use url::Url;
+use ze_asset_editor::AssetEditorManager;
 use ze_asset_server::AssetServer;
 use ze_filesystem::{DirEntryType, FileSystem, IterDirFlags};
 use ze_imgui::ze_imgui_sys::*;
@@ -18,6 +19,7 @@ pub struct AssetExplorer {
     current_directory: Url,
     directory_icon: Option<Arc<Icon>>,
     file_icon: Option<Arc<Icon>>,
+    asset_editor_manager: Arc<AssetEditorManager>,
 }
 
 impl AssetExplorer {
@@ -25,6 +27,7 @@ impl AssetExplorer {
         asset_server: Arc<AssetServer>,
         icon_manager: Arc<IconManager>,
         filesystem: Arc<FileSystem>,
+        asset_editor_manager: Arc<AssetEditorManager>,
     ) -> Self {
         Self {
             asset_server,
@@ -32,6 +35,7 @@ impl AssetExplorer {
             current_directory: Url::from_str("vfs://main/assets").unwrap(),
             directory_icon: icon_manager.icon("icons8-folder-64"),
             file_icon: icon_manager.icon("icons8-file-64"),
+            asset_editor_manager,
         }
     }
 
@@ -74,7 +78,7 @@ impl AssetExplorer {
             WindowFlags::empty(),
         );
 
-        imgui.dummy(ImVec2::new(0.0, 10.0));
+        imgui.dummy(ImVec2::new(0.0, 5.0));
         imgui.dummy(ImVec2::new(10.0, 0.0));
         imgui.same_line(0.0, -1.0);
 
@@ -129,21 +133,32 @@ impl AssetExplorer {
                 .split('.');
 
             let file_name = file_name_and_extension.next().unwrap();
-            let extension = file_name_and_extension.next();
 
             imgui.table_next_column();
 
             imgui.begin_child(
                 entry.url.as_str(),
-                ImVec2::new(90.0, 120.0),
+                ImVec2::new(90.0, 150.0),
                 false,
-                WindowFlags::empty(),
+                make_bitflags! { WindowFlagBits::{NoScrollbar | NoScrollWithMouse} },
             );
+
+            let cursor_screen_pos = imgui.cursor_screen_pos();
+            imgui.window_add_rect_filled(
+                cursor_screen_pos,
+                cursor_screen_pos + imgui.available_content_region(),
+                ImVec4::from(0.115),
+            );
+
             if imgui.is_window_hovered() {
-                if entry.ty == DirEntryType::Directory
-                    && imgui.is_mouse_double_clicked(MouseButton::Left)
-                {
-                    self.current_directory = entry.url.clone();
+                if imgui.is_mouse_double_clicked(MouseButton::Left) {
+                    if entry.ty == DirEntryType::Directory {
+                        self.current_directory = entry.url.clone();
+                    } else if let Some(uuid) = self.asset_server.asset_uuid_from_url(&entry.url) {
+                        if let Some(type_uuid) = self.asset_server.asset_type_uuid(uuid) {
+                            self.asset_editor_manager.open_asset(type_uuid, uuid);
+                        }
+                    }
                 }
 
                 let cursor_screen_pos = imgui.cursor_screen_pos();
@@ -152,19 +167,9 @@ impl AssetExplorer {
                     cursor_screen_pos + imgui.available_content_region(),
                     unsafe { (*igGetStyle()).Colors[ImGuiCol__ImGuiCol_HeaderHovered as usize] },
                 );
-
-                if entry.ty == DirEntryType::File {
-                    imgui.push_style_var_Vec2f32(StyleVar::WindowPadding, ImVec2::new(5.0, 5.0));
-                    imgui.begin_tooltip();
-                    imgui.pop_style_var(1);
-
-                    imgui.text(&format!("Format: {}", extension.unwrap()));
-
-                    imgui.end_tooltip();
-                }
             }
 
-            imgui.dummy(ImVec2::new(0.0, 5.0));
+            imgui.dummy(ImVec2::new(0.0, 15.0));
 
             let icon = if entry.ty == DirEntryType::Directory {
                 &self.directory_icon
@@ -175,6 +180,7 @@ impl AssetExplorer {
                 imgui.image_centered(&icon.srv, ImVec2::new(64.0, 64.0));
             }
 
+            imgui.dummy(ImVec2::new(0.0, 5.0));
             imgui.text_centered_wrapped(file_name, 8);
             imgui.end_child();
         }

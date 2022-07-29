@@ -18,6 +18,12 @@ impl Default for ImVec2 {
     }
 }
 
+impl From<f32> for ImVec2 {
+    fn from(f: f32) -> Self {
+        Self { x: f, y: f }
+    }
+}
+
 impl Add for ImVec2 {
     type Output = ImVec2;
 
@@ -32,5 +38,16 @@ impl Add for ImVec2 {
 impl ImVec4 {
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
         Self { x, y, z, w }
+    }
+}
+
+impl From<f32> for ImVec4 {
+    fn from(f: f32) -> Self {
+        Self {
+            x: f,
+            y: f,
+            z: f,
+            w: 1.0,
+        }
     }
 }
