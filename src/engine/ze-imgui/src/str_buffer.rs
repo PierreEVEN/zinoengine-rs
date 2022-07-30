@@ -10,6 +10,10 @@ pub struct StrBuffer {
 
 impl StrBuffer {
     pub fn convert(&mut self, text: &str) -> *const c_char {
+        if text.len() > self.buffer.len() {
+            self.buffer.resize(text.len().next_power_of_two(), 0);
+        }
+
         unsafe {
             ptr::copy_nonoverlapping(text.as_ptr(), self.buffer.as_mut_ptr(), text.len());
         }

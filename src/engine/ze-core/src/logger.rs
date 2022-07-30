@@ -96,18 +96,6 @@ pub fn register_sink_weak<T: Sink + 'static>(sink: Weak<T>) {
     SINKS.write().push(SinkEntry::Weak(sink));
 }
 
-pub fn unregister_sink(sink: &Arc<dyn Sink>) {
-    let mut sinks = SINKS.write();
-    for (i, e) in sinks.iter().enumerate() {
-        if let SinkEntry::Arc(arc) = e {
-            if Arc::ptr_eq(arc, sink) {
-                sinks.remove(i);
-                break;
-            }
-        }
-    }
-}
-
 /** Default logging macros */
 #[macro_export]
 macro_rules! ze_verbose {
