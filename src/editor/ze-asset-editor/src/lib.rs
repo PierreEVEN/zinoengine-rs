@@ -2,9 +2,10 @@ use parking_lot::Mutex;
 use std::collections::HashMap;
 use ze_core::type_uuid::Uuid;
 use ze_imgui::ze_imgui_sys::ImGuiID;
+use ze_imgui::{WindowFlagBits, WindowFlags};
 
 pub trait AssetEditor {
-    fn draw(&self, imgui: &mut ze_imgui::Context);
+    fn draw(&mut self, imgui: &mut ze_imgui::Context);
     fn asset_uuid(&self) -> Uuid;
 }
 
@@ -39,10 +40,29 @@ impl AssetEditorManager {
     }
 
     pub fn draw_editors(&self, imgui: &mut ze_imgui::Context, main_dockspace_id: ImGuiID) {
-        let editors = self.editors.lock();
-        for editor in editors.iter() {
+        let mut editors = self.editors.lock();
+        let mut editors_to_remove = vec![];
+        for (i, editor) in editors.iter_mut().enumerate() {
             imgui.next_window_dock_id(main_dockspace_id);
-            editor.draw(imgui);
+            let mut is_open = true;
+            if imgui.begin_window_closable(
+                &editor.asset_uuid().to_string(),
+                &mut is_open,
+                WindowFlags::from_flag(WindowFlagBits::NoSavedSettings),
+            ) && is_open
+            {
+                editor.draw(imgui);
+            }
+
+            if !is_open {
+                editors_to_remove.push(i);
+            }
+
+            imgui.end_window();
+        }
+
+        for i in editors_to_remove {
+            editors.remove(i);
         }
     }
 }

@@ -1,6 +1,10 @@
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+use ze_reflection::*;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromPrimitive, Reflectable)]
 #[non_exhaustive]
 pub enum PixelFormat {
     Unknown,
@@ -11,9 +15,37 @@ pub enum PixelFormat {
     R8G8B8A8Unorm,
 }
 
+impl PixelFormat {
+    pub fn bytes_size(&self) -> u64 {
+        match self {
+            PixelFormat::Unknown => 0,
+            PixelFormat::B8G8R8A8UnormSrgb
+            | PixelFormat::B8G8R8A8Unorm
+            | PixelFormat::R8G8B8A8Unorm => 4,
+            PixelFormat::R8G8B8Unorm => 3,
+        }
+    }
+
+    pub fn texture_size_in_bytes(&self, width: u32, height: u32) -> u64 {
+        (width as u64) * (height as u64) * self.bytes_size()
+    }
+}
+
 impl Default for PixelFormat {
     fn default() -> Self {
         Self::Unknown
+    }
+}
+
+impl Display for PixelFormat {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PixelFormat::B8G8R8A8UnormSrgb => write!(f, "BGRA 8-bit (unorm, sRGB)"),
+            PixelFormat::B8G8R8A8Unorm => write!(f, "BGRA 8-bit (unorm)"),
+            PixelFormat::R8G8B8Unorm => write!(f, "RGB 8-bit (unorm)"),
+            PixelFormat::R8G8B8A8Unorm => write!(f, "RGBA 8-bit (unorm)"),
+            _ => write!(f, "{:?}", self),
+        }
     }
 }
 

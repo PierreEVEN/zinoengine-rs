@@ -10,6 +10,7 @@ use std::time::Instant;
 use url::Url;
 use ze_asset_server::{AssetServer, AssetServerProvider};
 use ze_asset_system::AssetManager;
+use ze_core::maths::Vec2f32;
 use ze_core::type_uuid::TypeUuid;
 use ze_d3d12_backend::backend::D3D12Backend;
 use ze_d3d12_shader_compiler::D3D12ShaderCompiler;
@@ -26,6 +27,11 @@ use ze_shader_compiler::ShaderCompiler;
 use ze_shader_system::ShaderManager;
 use ze_texture_asset::importer::TextureImporter;
 use ze_texture_asset::loader::TextureLoader;
+use ze_ui::renderer::ViewportRenderer;
+use ze_ui::widgets::ColumnSlot;
+use ze_ui::widgets::RowSlot;
+use ze_ui::widgets::{Column, EdgeInsets, Row};
+use ze_ui::{ze_ui_decl, UiState};
 use ze_windows_platform::WindowsPlatform;
 
 pub struct EditorApplication {
@@ -35,7 +41,7 @@ pub struct EditorApplication {
     _jobsystem: Arc<JobSystem>,
     filesystem: Arc<FileSystem>,
     _shader_compiler: Arc<dyn ShaderCompiler>,
-    _shader_manager: Arc<ShaderManager>,
+    shader_manager: Arc<ShaderManager>,
     main_window: Arc<dyn Window>,
     main_window_swapchain: Option<Arc<SwapChain>>,
     main_window_swapchain_rtvs: Vec<Arc<RenderTargetView>>,
@@ -93,7 +99,7 @@ impl EditorApplication {
             _jobsystem: jobsystem,
             filesystem: filesystem.clone(),
             _shader_compiler: shader_compiler,
-            _shader_manager: shader_manager,
+            shader_manager: shader_manager,
             main_window,
             main_window_swapchain: None,
             main_window_swapchain_rtvs: vec![],
@@ -147,12 +153,58 @@ impl EditorApplication {
 
         let console = Console::new();
 
+        let mut ui_state = UiState::default();
+
+        let flex = ze_ui_decl! {
+            Column
+            + ColumnSlot()
+            .padding(EdgeInsets::all(10.0).into())
+            {
+                Row
+                + RowSlot()
+                .padding(EdgeInsets::all(10.0).into())
+                {
+                    Row
+                    + RowSlot()
+                    .padding(EdgeInsets::all(10.0).into())
+                    {
+                        Row
+                    }
+                    + RowSlot()
+                    .padding(EdgeInsets::all(10.0).into())
+                    {
+                        Row
+                    }
+                }
+                + RowSlot()
+                .padding(EdgeInsets::all(10.0).into())
+                {
+                    Row
+                }
+                + RowSlot()
+                .padding(EdgeInsets::all(10.0).into())
+                {
+                    Row
+                }
+            }
+            + ColumnSlot()
+            .padding(EdgeInsets::all(10.0).into())
+            {
+                Column
+            }
+        };
+
+        ui_state.set_root_widget(Some(flex));
+
+        let mut viewport_renderer =
+            ViewportRenderer::new(self.device.clone(), self.shader_manager.clone());
+
         while running {
             let delta_time = previous.elapsed().as_secs_f32();
             previous = Instant::now();
 
             while let Some(message) = self.platform.poll_event() {
-                self.imgui.send_platform_message(&message);
+                //self.imgui.send_platform_message(&message);
                 match message {
                     Message::WindowClosed(event_window) => {
                         if Weak::ptr_eq(&event_window, &Arc::downgrade(&self.main_window)) {
@@ -171,6 +223,7 @@ impl EditorApplication {
 
             self.device.begin_frame();
 
+            /*
             self.imgui.begin_frame(
                 delta_time,
                 self.platform.mouse_position(),
@@ -193,8 +246,18 @@ impl EditorApplication {
             asset_explorer.draw(&mut self.imgui);
             asset_editor_manager.draw_editors(&mut self.imgui, main_dockspace_id);
             console.draw(&mut self.imgui);
-            self.imgui.end_frame();
 
+            // FIXME: ZEUI DEBUGGING
+            if self
+                .imgui
+                .begin_window("zeui debugging", WindowFlags::empty())
+            {
+                let debug = format!("{:#?}", ui_state);
+                self.imgui.text(&debug);
+            }
+            self.imgui.end_window();
+            self.imgui.end_frame();
+            */
             // Render
 
             let swapchain = self.main_window_swapchain.as_ref().unwrap();
@@ -220,7 +283,7 @@ impl EditorApplication {
 
             let mut render_graph = RenderGraph::new(self.device.clone(), &mut main_registry);
             render_graph.add_graphics_pass(
-                "imgui",
+                "ui",
                 |render_graph, render_pass| {
                     render_graph.add_pass_color_output(
                         render_pass,
@@ -229,19 +292,25 @@ impl EditorApplication {
                     );
                 },
                 |_, cmd_list| {
-                    self.imgui
-                        .draw_viewport(cmd_list, self.imgui.main_viewport());
+                    //self.imgui
+                    //    .draw_viewport(cmd_list, self.imgui.main_viewport());
+                    viewport_renderer.draw(
+                        delta_time,
+                        &mut ui_state,
+                        cmd_list,
+                        Vec2f32::new(swapchain.info.width as f32, swapchain.info.height as f32),
+                    );
                 },
             );
 
             render_graph.compile("backbuffer");
             render_graph.execute(&mut main_cmd_list);
 
-            self.imgui.draw_non_main_viewports(&mut main_cmd_list);
+            //self.imgui.draw_non_main_viewports(&mut main_cmd_list);
             self.device
                 .submit(QueueType::Graphics, &[&main_cmd_list], &[], &[]);
             self.device.present(swapchain);
-            self.imgui.present();
+            //self.imgui.present();
 
             self.device.end_frame();
         }

@@ -1,15 +1,139 @@
-﻿use std::ops::{Index, IndexMut};
+﻿use num_traits::{Num, NumAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Sub, SubAssign};
 
 /// A two-dimensional vector that can either represent a direction or a point in space
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Default)]
-pub struct Vec2<T: Default> {
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Default, Copy, Clone)]
+pub struct Vec2<T: Num> {
     pub x: T,
     pub y: T,
 }
 
-impl<T: Default> Vec2<T> {
+impl<T: Num + Copy> Vec2<T> {
     pub fn new(x: T, y: T) -> Self {
         Self { x, y }
+    }
+
+    pub fn lerp(a: Vec2<T>, b: Vec2<T>, alpha: T) -> Self {
+        let x = a.x + alpha * (b.x - a.x);
+        let y = a.y + alpha * (b.y - a.y);
+        Self { x, y }
+    }
+}
+
+impl<T: Num> Add for Vec2<T> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
+    }
+}
+
+impl<T: Num> Sub for Vec2<T> {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+        }
+    }
+}
+
+impl<T: Num> Mul for Vec2<T> {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x * rhs.x,
+            y: self.y * rhs.y,
+        }
+    }
+}
+
+impl<T: Num> Div for Vec2<T> {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x / rhs.x,
+            y: self.y / rhs.y,
+        }
+    }
+}
+
+impl<T: NumAssign> AddAssign for Vec2<T> {
+    fn add_assign(&mut self, rhs: Self) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+    }
+}
+
+impl<T: NumAssign> SubAssign for Vec2<T> {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.x -= rhs.x;
+        self.y -= rhs.y;
+    }
+}
+
+impl<T: NumAssign> MulAssign for Vec2<T> {
+    fn mul_assign(&mut self, rhs: Self) {
+        self.x *= rhs.x;
+        self.y *= rhs.y;
+    }
+}
+
+impl<T: NumAssign> DivAssign for Vec2<T> {
+    fn div_assign(&mut self, rhs: Self) {
+        self.x /= rhs.x;
+        self.y /= rhs.y;
+    }
+}
+
+// Scalar
+impl<T: Num + Copy> Add<T> for Vec2<T> {
+    type Output = Self;
+
+    fn add(self, rhs: T) -> Self::Output {
+        Self {
+            x: self.x + rhs,
+            y: self.y + rhs,
+        }
+    }
+}
+
+impl<T: Num + Copy> Sub<T> for Vec2<T> {
+    type Output = Self;
+
+    fn sub(self, rhs: T) -> Self::Output {
+        Self {
+            x: self.x + rhs,
+            y: self.y + rhs,
+        }
+    }
+}
+
+impl<T: Num + Copy> Mul<T> for Vec2<T> {
+    type Output = Self;
+
+    fn mul(self, rhs: T) -> Self::Output {
+        Self {
+            x: self.x * rhs,
+            y: self.y * rhs,
+        }
+    }
+}
+
+impl<T: Num + Copy> Div<T> for Vec2<T> {
+    type Output = Self;
+
+    fn div(self, rhs: T) -> Self::Output {
+        Self {
+            x: self.x / rhs,
+            y: self.y / rhs,
+        }
     }
 }
 

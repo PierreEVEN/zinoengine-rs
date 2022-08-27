@@ -177,7 +177,7 @@ impl AssetExplorer {
                 &self.file_icon
             };
             if let Some(icon) = icon {
-                imgui.image_centered(&icon.srv, ImVec2::new(64.0, 64.0));
+                imgui.image_centered_x(&icon.srv, ImVec2::new(64.0, 64.0));
             }
 
             imgui.dummy(ImVec2::new(0.0, 5.0));

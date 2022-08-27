@@ -1,0 +1,11 @@
+[package]
+name = "ze-property-editor"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ze-imgui = { version = "0.1.0", path = "../../engine/ze-imgui" }
+ze-reflection = { version = "0.1.0", path = "../../engine/ze-reflection" }
+enumflags2 = "0.7.5"

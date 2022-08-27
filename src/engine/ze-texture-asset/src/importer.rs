@@ -1,5 +1,7 @@
 ﻿use crate::Texture;
 use image::{ColorType, ImageFormat};
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 use std::io::Read;
 use url::Url;
@@ -9,8 +11,9 @@ use ze_asset_system::importer::{
 };
 use ze_core::type_uuid::*;
 use ze_gfx::PixelFormat;
+use ze_reflection::*;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Copy, Clone, Serialize, Deserialize, FromPrimitive, Reflectable)]
 pub enum TextureCompressionMode {
     None,
 
@@ -24,15 +27,24 @@ pub enum TextureCompressionMode {
     TangentSpaceNormalMap,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Reflectable)]
 pub struct Parameters {
+    #[ze_reflect(display_name = "Compression Mode")]
     compression_mode: TextureCompressionMode,
+
+    #[ze_reflect(display_name = "sRGB")]
+    s_rgb: bool,
+
+    #[ze_reflect(display_name = "Generate Mipmaps")]
+    generate_mipmaps: bool,
 }
 
 impl Default for Parameters {
     fn default() -> Self {
         Self {
             compression_mode: TextureCompressionMode::HighQuality,
+            s_rgb: true,
+            generate_mipmaps: false,
         }
     }
 }

@@ -3,15 +3,51 @@ use parking_lot::Mutex;
 
 /// An object storing functions to be called when signaled
 
-type Slot<Args> = Box<dyn FnMut(Args) + Send>;
+type Slot<Args> = Box<dyn FnMut(Args)>;
+type SyncSlot<Args> = Box<dyn FnMut(Args) + Send>;
 
 pub struct Handle(usize);
 
 pub struct Signal<Args> {
-    slots: Mutex<SparseVec<Slot<Args>>>,
+    slots: SparseVec<Slot<Args>>,
 }
 
 impl<Args> Signal<Args>
+where
+    Args: Clone + 'static,
+{
+    pub fn connect<F>(&mut self, func: F) -> Handle
+    where
+        F: FnMut(Args) + 'static,
+    {
+        Handle(self.slots.add(Box::new(func)))
+    }
+
+    pub fn disconnect(&mut self, handle: Handle) -> bool {
+        self.slots.remove(handle.0)
+    }
+
+    pub fn emit(&mut self, args: Args) {
+        for slot in self.slots.iter_mut() {
+            (slot)(args.clone())
+        }
+    }
+}
+
+impl<Args> Default for Signal<Args> {
+    fn default() -> Self {
+        Self {
+            slots: Default::default(),
+        }
+    }
+}
+
+/// Sync version of `Signal`
+pub struct SyncSignal<Args> {
+    slots: Mutex<SparseVec<SyncSlot<Args>>>,
+}
+
+impl<Args> SyncSignal<Args>
 where
     Args: Clone + 'static,
 {
@@ -36,7 +72,7 @@ where
     }
 }
 
-impl<Args> Default for Signal<Args> {
+impl<Args> Default for SyncSignal<Args> {
     fn default() -> Self {
         Self {
             slots: Default::default(),
@@ -46,14 +82,14 @@ impl<Args> Default for Signal<Args> {
 
 #[cfg(test)]
 mod tests {
-    use crate::signals::Signal;
+    use crate::signals::SyncSignal;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
 
     #[test]
     fn connect_emit() {
         let received = Arc::new(AtomicBool::new(false));
-        let mut signal: Signal<()> = Signal::default();
+        let mut signal: SyncSignal<()> = SyncSignal::default();
         {
             let received = received.clone();
             signal.connect(move |_| received.store(true, Ordering::SeqCst));
@@ -67,7 +103,7 @@ mod tests {
     #[test]
     fn connect_disconnect_and_emit() {
         let received = Arc::new(AtomicBool::new(false));
-        let mut signal: Signal<()> = Signal::default();
+        let mut signal: SyncSignal<()> = SyncSignal::default();
         {
             let received = received.clone();
             let handle = signal.connect(move |_| received.store(true, Ordering::SeqCst));

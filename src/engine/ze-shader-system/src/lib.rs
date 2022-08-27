@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use url::Url;
-use ze_core::signals::Signal;
+use ze_core::signals::SyncSignal;
 use ze_core::sparse_vec::SparseVec;
 use ze_core::{ze_error, ze_info};
 use ze_filesystem::{FileSystem, IterDirFlagBits, IterDirFlags, WatchEvent};
@@ -108,7 +108,7 @@ pub struct CompilingShader {
     bytecodes: Mutex<Vec<(ShaderStageFlagBits, Vec<u8>)>>,
     processed_stages: AtomicUsize,
     stage_count: usize,
-    pub on_compiled: Signal<()>,
+    pub on_compiled: SyncSignal<()>,
 }
 
 impl CompilingShader {
@@ -268,7 +268,7 @@ impl ShaderManager {
 
     /// Get the modules of the specified shader
     /// If not available yet (compiling) it will returns a signal to know when the shader is ready
-    pub fn get_shader_modules(
+    pub fn shader_modules(
         self: &Arc<ShaderManager>,
         name: &String,
         pass: Option<String>,

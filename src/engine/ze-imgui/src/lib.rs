@@ -204,9 +204,8 @@ impl Context {
             colors[ImGuiCol__ImGuiCol_PopupBg as usize] = ImVec4::new(0.20, 0.20, 0.20, 0.94);
             colors[ImGuiCol__ImGuiCol_Border as usize] = ImVec4::new(0.09, 0.09, 0.09, 1.0);
             colors[ImGuiCol__ImGuiCol_BorderShadow as usize] = ImVec4::new(0.00, 0.00, 0.00, 0.00);
-            colors[ImGuiCol__ImGuiCol_FrameBg as usize] = ImVec4::new(0.15, 0.15, 0.15, 1.0);
-            colors[ImGuiCol__ImGuiCol_FrameBgHovered as usize] =
-                ImVec4::new(0.30, 0.30, 0.30, 0.40);
+            colors[ImGuiCol__ImGuiCol_FrameBg as usize] = ImVec4::new(0.09, 0.09, 0.09, 1.0);
+            colors[ImGuiCol__ImGuiCol_FrameBgHovered as usize] = ImVec4::new(0.05, 0.05, 0.05, 1.0);
             colors[ImGuiCol__ImGuiCol_FrameBgActive as usize] = ImVec4::new(0.33, 0.33, 0.33, 0.67);
             colors[ImGuiCol__ImGuiCol_TitleBg as usize] = ImVec4::new(0.16, 0.16, 0.16, 1.00);
             colors[ImGuiCol__ImGuiCol_TitleBgActive as usize] = ImVec4::new(0.16, 0.16, 0.16, 1.00);
@@ -226,10 +225,10 @@ impl Context {
             colors[ImGuiCol__ImGuiCol_Button as usize] = ImVec4::new(0.29, 0.29, 0.29, 0.40);
             colors[ImGuiCol__ImGuiCol_ButtonHovered as usize] = ImVec4::new(0.26, 0.26, 0.26, 1.00);
             colors[ImGuiCol__ImGuiCol_ButtonActive as usize] = ImVec4::new(0.23, 0.23, 0.23, 1.00);
-            colors[ImGuiCol__ImGuiCol_Header as usize] = ImVec4::new(0.27, 0.33, 0.43, 1.0);
+            colors[ImGuiCol__ImGuiCol_Header as usize] = ImVec4::from(0.115);
             colors[ImGuiCol__ImGuiCol_HeaderHovered as usize] = ImVec4::new(0.27, 0.33, 0.43, 0.45);
             colors[ImGuiCol__ImGuiCol_HeaderActive as usize] = ImVec4::new(0.27, 0.33, 0.63, 1.00);
-            colors[ImGuiCol__ImGuiCol_Separator as usize] = ImVec4::new(0.15, 0.14, 0.16, 0.50);
+            colors[ImGuiCol__ImGuiCol_Separator as usize] = ImVec4::new(0.25, 0.25, 0.25, 1.0);
             colors[ImGuiCol__ImGuiCol_SeparatorHovered as usize] =
                 ImVec4::new(0.15, 0.14, 0.16, 1.00);
             colors[ImGuiCol__ImGuiCol_SeparatorActive as usize] =
@@ -630,6 +629,22 @@ pub enum StyleVar {
 
 // UI elements
 impl Context {
+    pub fn separator(&self) {
+        unsafe {
+            igSeparator();
+        }
+    }
+
+    pub fn collapsing_header(&mut self, label: &str, flags: TreeNodeFlags) -> bool {
+        let label = self.str_buffer.convert(label);
+        unsafe { igCollapsingHeader_TreeNodeFlags(label, flags.bits() as i32) }
+    }
+
+    pub fn checkbox(&mut self, label: &str, checked: &mut bool) -> bool {
+        let label = self.str_buffer.convert(label);
+        unsafe { igCheckbox(label, checked) }
+    }
+
     pub fn text(&mut self, text: &str) {
         let c_text = self.str_buffer.convert(text);
         unsafe { igTextUnformatted(c_text, c_text.add(text.len())) };
@@ -681,6 +696,16 @@ impl Context {
     pub fn image_centered(&mut self, srv: &ShaderResourceView, size: ImVec2) {
         unsafe {
             let window_width = igGetWindowWidth();
+            let window_height = igGetWindowHeight();
+            igSetCursorPosX((window_width - size.x) * 0.5);
+            igSetCursorPosY((window_height - size.y) * 0.5);
+        }
+        self.image(srv, size);
+    }
+
+    pub fn image_centered_x(&mut self, srv: &ShaderResourceView, size: ImVec2) {
+        unsafe {
+            let window_width = igGetWindowWidth();
             igSetCursorPosX((window_width - size.x) * 0.5);
         }
         self.image(srv, size);
@@ -719,6 +744,16 @@ impl Context {
     pub fn begin_window(&mut self, name: &str, flags: WindowFlags) -> bool {
         let name = self.str_buffer.convert(name);
         unsafe { igBegin(name, std::ptr::null_mut(), flags.bits() as i32) }
+    }
+
+    pub fn begin_window_closable(
+        &mut self,
+        name: &str,
+        open: &mut bool,
+        flags: WindowFlags,
+    ) -> bool {
+        let name = self.str_buffer.convert(name);
+        unsafe { igBegin(name, open, flags.bits() as i32) }
     }
 
     pub fn end_window(&mut self) {
@@ -859,6 +894,43 @@ impl Context {
             igSetNextWindowDockID(id, ImGuiCond__ImGuiCond_Once);
         }
     }
+
+    pub fn push_id_str(&mut self, id: &str) {
+        let c_id = self.str_buffer.convert(id);
+        unsafe { igPushID_Str(c_id) }
+    }
+
+    pub fn push_id_i32(&mut self, id: i32) {
+        unsafe { igPushID_Int(id) }
+    }
+
+    pub fn push_id_ptr<T>(&mut self, ptr: *const T) {
+        unsafe { igPushID_Ptr(ptr as *const c_void) }
+    }
+
+    pub fn pop_id(&self) {
+        unsafe { igPopID() }
+    }
+
+    pub fn begin_combo(&mut self, label: &str, preview_value: &str) -> bool {
+        // TODO: Rework strbuffer, i'm lazy for now
+        let c_label = self.str_buffer.convert(label);
+        let mut preview_value_buffer = StrBuffer::default();
+        let preview_value = preview_value_buffer.convert(preview_value);
+        unsafe {
+            igBeginCombo(
+                c_label,
+                preview_value,
+                ImGuiComboFlags__ImGuiComboFlags_None,
+            )
+        }
+    }
+
+    pub fn end_combo(&self) {
+        unsafe {
+            igEndCombo();
+        }
+    }
 }
 
 impl Context {
@@ -970,10 +1042,10 @@ fn draw_viewport_internal(
     let draw_data = unsafe { viewport.DrawData.as_ref().unwrap_unchecked() };
     renderer_data.update_buffers(device, draw_data);
 
-    if let Ok(shader) = shader_manager.get_shader_modules(&"ImGui".to_string(), None) {
+    if let Ok(shader) = shader_manager.shader_modules(&"ImGui".to_string(), None) {
         if draw_data.CmdListsCount > 0 {
-            #[rustfmt::skip]
-                let projection_matrix = {
+            #[rustfmt::skip] 
+            let projection_matrix = {
                 let left = draw_data.DisplayPos.x;
                 let right = draw_data.DisplayPos.x + draw_data.DisplaySize.x;
                 let top = draw_data.DisplayPos.y;

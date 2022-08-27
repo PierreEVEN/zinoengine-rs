@@ -1,0 +1,13 @@
+[package]
+name = "ze-ui"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ze-core = { version = "0.1.0", path = "../ze-core" }
+ze-gfx = { version = "0.1.0", path = "../ze-gfx" }
+ze-shader-system = { version = "0.1.0", path = "../ze-shader-system" }
+rand = "0.8.5"
+downcast-rs = "1.2.0"
