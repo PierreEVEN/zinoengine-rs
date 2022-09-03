@@ -4,6 +4,7 @@
 #![allow(clippy::all)]
 
 use std::ops::Add;
+
 include!("./bindings.rs");
 
 impl ImVec2 {

@@ -1,6 +1,7 @@
 ﻿use crate::asset_explorer::AssetExplorer;
 use crate::console::Console;
 use crate::icon_manager::IconManager;
+use cfg_if::cfg_if;
 use enumflags2::make_bitflags;
 use std::env;
 use std::path::Path;
@@ -12,8 +13,7 @@ use ze_asset_server::{AssetServer, AssetServerProvider};
 use ze_asset_system::AssetManager;
 use ze_core::maths::Vec2f32;
 use ze_core::type_uuid::TypeUuid;
-use ze_d3d12_backend::backend::D3D12Backend;
-use ze_d3d12_shader_compiler::D3D12ShaderCompiler;
+use ze_core::ze_info;
 use ze_filesystem::mount_points::StdMountPoint;
 use ze_filesystem::FileSystem;
 use ze_gfx::backend::*;
@@ -32,7 +32,24 @@ use ze_ui::widgets::ColumnSlot;
 use ze_ui::widgets::RowSlot;
 use ze_ui::widgets::{Column, EdgeInsets, Row};
 use ze_ui::{ze_ui_decl, UiState};
+
+#[cfg(target_os = "windows")]
 use ze_windows_platform::WindowsPlatform;
+
+#[cfg(target_os = "windows")]
+use ze_d3d12_shader_compiler::D3D12ShaderCompiler;
+
+#[cfg(target_os = "windows")]
+use ze_d3d12_backend::backend::D3D12Backend;
+
+#[cfg(target_os = "macos")]
+use ze_macos_platform::MacOSPlatform;
+
+#[cfg(target_os = "macos")]
+use ze_metal_backend::MetalBackend;
+
+#[cfg(target_os = "macos")]
+use ze_metal_shader_compiler::MetalShaderCompiler;
 
 pub struct EditorApplication {
     platform: Arc<dyn Platform>,
@@ -51,20 +68,47 @@ pub struct EditorApplication {
 
 impl EditorApplication {
     pub fn new() -> Self {
-        let platform = WindowsPlatform::new();
+        cfg_if! {
+            if #[cfg(target_os = "windows")] {
+                let platform = WindowsPlatform::new();
+            } else if #[cfg(target_os = "macos")] {
+                let platform = MacOSPlatform::new();
+            } else {
+                panic!("unsupported platform")
+            }
+        };
+
         let jobsystem = JobSystem::new(JobSystem::cpu_thread_count());
         let filesystem = FileSystem::new();
+        ze_info!("Cwd: {}", env::current_dir().unwrap_or_default().display());
         filesystem.mount(StdMountPoint::new(
             "main",
             Path::new(&env::current_dir().unwrap()),
         ));
 
-        let backend = D3D12Backend::new().expect("Failed to create graphics backend");
+        cfg_if! {
+            if #[cfg(target_os = "windows")] {
+                let backend = D3D12Backend::new().expect("Failed to create graphics backend");
+            } else if #[cfg(target_os = "macos")] {
+                let backend = MetalBackend::new().expect("Failed to create graphics backend");
+            } else {
+                panic!("unsupported platform")
+            }
+        };
+
         let device = backend
             .create_device()
             .expect("Failed to create graphics device");
 
-        let shader_compiler = D3D12ShaderCompiler::new(filesystem.clone());
+        cfg_if! {
+            if #[cfg(target_os = "windows")] {
+                let shader_compiler = D3D12ShaderCompiler::new(filesystem.clone());
+            } else if #[cfg(target_os = "macos")] {
+                let shader_compiler = MetalShaderCompiler::new();
+            } else {
+                panic!("unsupported platform")
+            }
+        };
 
         let shader_manager =
             ShaderManager::new(device.clone(), jobsystem.clone(), shader_compiler.clone());
@@ -99,7 +143,7 @@ impl EditorApplication {
             _jobsystem: jobsystem,
             filesystem: filesystem.clone(),
             _shader_compiler: shader_compiler,
-            shader_manager: shader_manager,
+            shader_manager,
             main_window,
             main_window_swapchain: None,
             main_window_swapchain_rtvs: vec![],

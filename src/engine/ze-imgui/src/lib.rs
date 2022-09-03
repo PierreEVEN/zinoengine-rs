@@ -37,12 +37,12 @@ impl Context {
         let context = unsafe { igCreateContext(std::ptr::null_mut()) };
 
         let io = unsafe { igGetIO().as_mut().unwrap_unchecked() };
-        io.ConfigFlags |= ImGuiConfigFlags__ImGuiConfigFlags_ViewportsEnable;
-        io.ConfigFlags |= ImGuiConfigFlags__ImGuiConfigFlags_DockingEnable;
-        io.BackendFlags |= ImGuiBackendFlags__ImGuiBackendFlags_HasMouseCursors;
-        io.BackendFlags |= ImGuiBackendFlags__ImGuiBackendFlags_PlatformHasViewports;
-        io.BackendFlags |= ImGuiBackendFlags__ImGuiBackendFlags_RendererHasViewports;
-        io.BackendFlags |= ImGuiBackendFlags__ImGuiBackendFlags_RendererHasVtxOffset;
+        io.ConfigFlags |= ImGuiConfigFlags__ImGuiConfigFlags_ViewportsEnable as i32;
+        io.ConfigFlags |= ImGuiConfigFlags__ImGuiConfigFlags_DockingEnable as i32;
+        io.BackendFlags |= ImGuiBackendFlags__ImGuiBackendFlags_HasMouseCursors as i32;
+        io.BackendFlags |= ImGuiBackendFlags__ImGuiBackendFlags_PlatformHasViewports as i32;
+        io.BackendFlags |= ImGuiBackendFlags__ImGuiBackendFlags_RendererHasViewports as i32;
+        io.BackendFlags |= ImGuiBackendFlags__ImGuiBackendFlags_RendererHasVtxOffset as i32;
 
         unsafe {
             let file = CString::new("assets/Roboto-Regular.ttf").unwrap();
@@ -717,7 +717,7 @@ impl Context {
             igSelectable_Bool(
                 label,
                 true,
-                ImGuiSelectableFlags__ImGuiSelectableFlags_None,
+                ImGuiSelectableFlags__ImGuiSelectableFlags_None as i32,
                 size,
             )
         }
@@ -764,7 +764,7 @@ impl Context {
         unsafe {
             igDockSpaceOverViewport(
                 viewport,
-                ImGuiDockNodeFlags__ImGuiDockNodeFlags_None,
+                ImGuiDockNodeFlags__ImGuiDockNodeFlags_None as i32,
                 std::ptr::null(),
             )
         }
@@ -799,7 +799,7 @@ impl Context {
 
     pub fn table_next_row(&mut self) {
         unsafe {
-            igTableNextRow(ImGuiTableRowFlags__ImGuiTableRowFlags_None, 0.0);
+            igTableNextRow(ImGuiTableRowFlags__ImGuiTableRowFlags_None as i32, 0.0);
         }
     }
 
@@ -833,19 +833,19 @@ impl Context {
     }
 
     pub fn is_window_hovered(&self) -> bool {
-        unsafe { igIsWindowHovered(ImGuiHoveredFlags__ImGuiHoveredFlags_None) }
+        unsafe { igIsWindowHovered(ImGuiHoveredFlags__ImGuiHoveredFlags_None as i32) }
     }
 
     pub fn is_item_hovered(&self) -> bool {
-        unsafe { igIsItemHovered(ImGuiHoveredFlags__ImGuiHoveredFlags_None) }
+        unsafe { igIsItemHovered(ImGuiHoveredFlags__ImGuiHoveredFlags_None as i32) }
     }
 
     pub fn is_item_clicked(&self, button: MouseButton) -> bool {
         unsafe {
             igIsItemClicked(match button {
-                MouseButton::Left => ImGuiMouseButton__ImGuiMouseButton_Left,
-                MouseButton::Middle => ImGuiMouseButton__ImGuiMouseButton_Middle,
-                MouseButton::Right => ImGuiMouseButton__ImGuiMouseButton_Right,
+                MouseButton::Left => ImGuiMouseButton__ImGuiMouseButton_Left as i32,
+                MouseButton::Middle => ImGuiMouseButton__ImGuiMouseButton_Middle as i32,
+                MouseButton::Right => ImGuiMouseButton__ImGuiMouseButton_Right as i32,
             })
         }
     }
@@ -853,9 +853,9 @@ impl Context {
     pub fn is_mouse_double_clicked(&self, button: MouseButton) -> bool {
         unsafe {
             igIsMouseDoubleClicked(match button {
-                MouseButton::Left => ImGuiMouseButton__ImGuiMouseButton_Left,
-                MouseButton::Middle => ImGuiMouseButton__ImGuiMouseButton_Middle,
-                MouseButton::Right => ImGuiMouseButton__ImGuiMouseButton_Right,
+                MouseButton::Left => ImGuiMouseButton__ImGuiMouseButton_Left as i32,
+                MouseButton::Middle => ImGuiMouseButton__ImGuiMouseButton_Middle as i32,
+                MouseButton::Right => ImGuiMouseButton__ImGuiMouseButton_Right as i32,
             })
         }
     }
@@ -891,7 +891,7 @@ impl Context {
 
     pub fn next_window_dock_id(&self, id: ImGuiID) {
         unsafe {
-            igSetNextWindowDockID(id, ImGuiCond__ImGuiCond_Once);
+            igSetNextWindowDockID(id, ImGuiCond__ImGuiCond_Once as i32);
         }
     }
 
@@ -921,7 +921,7 @@ impl Context {
             igBeginCombo(
                 c_label,
                 preview_value,
-                ImGuiComboFlags__ImGuiComboFlags_None,
+                ImGuiComboFlags__ImGuiComboFlags_None as i32,
             )
         }
     }
@@ -950,7 +950,7 @@ impl Context {
                 max,
                 igColorConvertFloat4ToU32(color),
                 2.0,
-                ImDrawFlags__ImDrawFlags_None,
+                ImDrawFlags__ImDrawFlags_None as i32,
             )
         }
     }

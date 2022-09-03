@@ -1,0 +1,12 @@
+[package]
+name = "ze-metal-shader-compiler"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ze-gfx = {path = "../../ze-gfx", version = "0.1.0" }
+ze-filesystem = {path = "../../ze-filesystem", version = "0.1.0" }
+ze-shader-compiler = {path = "../../ze-shader-compiler", version = "0.1.0" }
+url = "2.2.2"

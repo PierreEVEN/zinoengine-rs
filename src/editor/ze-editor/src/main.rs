@@ -2,6 +2,7 @@ use crate::editor::EditorApplication;
 use ze_core::logger::StdoutSink;
 use ze_core::{logger, thread};
 
+#[cfg(target_os = "windows")]
 ze_d3d12_backend::ze_d3d12_agility_sdk_statics!();
 
 fn main() {

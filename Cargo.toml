@@ -1,2 +1,3 @@
 [workspace]
-members = ["src/editor/*", "src/engine/*"]
+members = ["src/editor/*", "src/engine/*", "src/engine/macos/*"]
+exclude = ["src/engine/macos"]
