@@ -1,8 +1,7 @@
 ﻿use crate::font::Font;
 use crate::{LayoutContext, UiState};
-use harfbuzz_rs::{GlyphBuffer, UnicodeBuffer};
+use harfbuzz_rs::GlyphBuffer;
 use std::mem::size_of;
-use std::rc::Rc;
 use std::slice;
 use std::sync::Arc;
 use ze_core::color::Color4f32;
@@ -47,7 +46,7 @@ pub struct DrawCommand {
 
 /// Hold context for drawing into a viewport
 pub struct DrawContext<'a> {
-    glyph_cache: &'a mut crate::glyph_cache::Cache,
+    _glyph_cache: &'a mut crate::glyph_cache::Cache,
     commands: Vec<DrawCommand>,
     vertices: Vec<Vertex>,
     indices: Vec<u16>,
@@ -56,7 +55,7 @@ pub struct DrawContext<'a> {
 impl<'a> DrawContext<'a> {
     pub fn new(glyph_cache: &'a mut crate::glyph_cache::Cache) -> Self {
         Self {
-            glyph_cache,
+            _glyph_cache: glyph_cache,
             commands: vec![],
             vertices: vec![],
             indices: vec![],
@@ -166,12 +165,12 @@ impl<'a> DrawContext<'a> {
         self.commands.last_mut().unwrap()
     }
 
-    pub fn text(&mut self, position: Vec2f32, font: &Font, shaped_buffer: &GlyphBuffer) {
-        let glyph_positions = shaped_buffer.get_glyph_positions();
+    pub fn text(&mut self, _position: Vec2f32, _font: &Font, _shaped_buffer: &GlyphBuffer) {
+        /*let glyph_positions = shaped_buffer.get_glyph_positions();
         let glyph_infos = shaped_buffer.get_glyph_infos();
         let mut current_advance_x = 0.0;
         let mut current_advance_y = 0.0;
-        /*for (info, glyph_position) in glyph_infos.iter().zip(glyph_positions) {
+        for (info, glyph_position) in glyph_infos.iter().zip(glyph_positions) {
             let cached_glyph = self
                 .glyph_cache
                 .glyph(font.hash(), font.glyph_index(info.codepoint));
@@ -223,8 +222,8 @@ impl<'a> DrawContext<'a> {
         )
     }
 
-    fn glyph_cache(&mut self) -> &mut crate::glyph_cache::Cache {
-        self.glyph_cache
+    fn _glyph_cache(&mut self) -> &mut crate::glyph_cache::Cache {
+        self._glyph_cache
     }
 }
 

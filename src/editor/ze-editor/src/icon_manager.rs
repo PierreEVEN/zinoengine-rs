@@ -89,7 +89,7 @@ impl IconManager {
 
                 let icon = Arc::new(Icon {
                     texture,
-                    srv: texture_srv.clone(),
+                    srv: texture_srv,
                 });
                 icons.insert(name.to_string(), icon.clone());
                 Some(icon)

@@ -1,16 +1,13 @@
-﻿use crate::font::Font;
-use rectangle_pack::{
+﻿use rectangle_pack::{
     contains_smallest_box, pack_rects, volume_heuristic, GroupedRectsToPlace, PackedLocation,
     RectToInsert, RectanglePackError, TargetBin,
 };
 use std::collections::{BTreeMap, HashMap};
-use std::rc::Rc;
 use std::sync::Arc;
 use ze_asset_system::Asset;
 use ze_core::maths::Vec2u32;
 use ze_core::type_uuid::Uuid;
-use ze_font_asset::{FontFace, FontFamily, GlyphBitmapData};
-use ze_freetype::{Face, LoadFlags, RenderMode};
+use ze_font_asset::{FontFace, GlyphBitmapData};
 use ze_gfx::backend::{
     Device, MemoryLocation, ResourceState, Texture, TextureDesc, TextureUsageFlags,
 };
@@ -20,10 +17,10 @@ use ze_gfx::{utils, PixelFormat};
 pub type BinId = u64;
 
 pub struct PositionedGlyph {
-    font_face: Uuid,
-    bin: BinId,
-    glyph: u32,
-    position: Vec2u32,
+    _font_face: Uuid,
+    _bin: BinId,
+    _glyph: u32,
+    _position: Vec2u32,
 }
 
 /// Object caching font characters into textures for rendering purposes
@@ -31,7 +28,6 @@ pub struct Cache {
     device: Arc<dyn Device>,
     atlases_size: Vec2u32,
     font_face_caches: HashMap<Uuid, FontFaceGlyphCache>,
-    ft_library: ze_freetype::Library,
 }
 
 impl Cache {
@@ -40,7 +36,6 @@ impl Cache {
             device,
             atlases_size,
             font_face_caches: Default::default(),
-            ft_library: ze_freetype::Library::new().expect("Failed to create freetype library"),
         }
     }
 
@@ -75,10 +70,10 @@ impl Cache {
             cache
                 .glyph_location(glyph_index)
                 .map(|location| PositionedGlyph {
-                    font_face: font_face_uuid,
-                    bin: location.0,
-                    glyph: glyph_index,
-                    position: Vec2u32::new(location.1.x(), location.1.y()),
+                    _font_face: font_face_uuid,
+                    _bin: location.0,
+                    _glyph: glyph_index,
+                    _position: Vec2u32::new(location.1.x(), location.1.y()),
                 })
         } else {
             None
@@ -220,7 +215,7 @@ impl FontFaceGlyphCache {
         self.free_bin_id += 1;
     }
 
-    fn face(&self) -> &Arc<FontFace> {
+    fn _face(&self) -> &Arc<FontFace> {
         &self.font_face
     }
 }

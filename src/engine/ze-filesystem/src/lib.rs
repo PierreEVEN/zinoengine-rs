@@ -207,9 +207,11 @@ impl FileSystem {
     }
 }
 
-pub mod mount_points;
-
 pub fn make_url_for_zefs(mount_point: &str, path: &str) -> Result<Url, ParseError> {
     let url = format!("vfs://{}{}", mount_point, path);
     Url::from_str(&url)
 }
+
+pub mod mount_points;
+pub extern crate percent_encoding;
+pub extern crate url;

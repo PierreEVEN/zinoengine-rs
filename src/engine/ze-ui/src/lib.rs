@@ -1,11 +1,7 @@
 use crate::font::FontCache;
 use crate::renderer::DrawContext;
 use downcast_rs::{impl_downcast, Downcast};
-use std::cell::RefCell;
 use std::fmt::Debug;
-use std::rc::Rc;
-use std::sync::Arc;
-use ze_asset_system::AssetManager;
 use ze_core::maths::Vec2f32;
 
 #[derive(PartialEq, Eq, Copy, Clone, Hash)]

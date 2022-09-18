@@ -2,12 +2,8 @@
 use crate::property::Property;
 use crate::renderer::DrawContext;
 use crate::{BoxConstraints, Constraints, LayoutContext, Widget};
-use harfbuzz_rs::{GlyphBuffer, UnicodeBuffer};
+use harfbuzz_rs::GlyphBuffer;
 use rand::{thread_rng, Rng};
-use std::ops::Deref;
-use std::rc::Rc;
-use std::str::FromStr;
-use ze_asset_system::url::Url;
 use ze_core::color::Color4f32;
 use ze_core::maths::Vec2f32;
 
@@ -191,9 +187,9 @@ impl TextBuilder {
 
 pub struct Text {
     font: Font,
-    text: String,
+    _text: String,
     size: Vec2f32,
-    shaped_buffer: Option<GlyphBuffer>,
+    _shaped_buffer: Option<GlyphBuffer>,
 }
 
 impl Text {
@@ -204,9 +200,9 @@ impl Text {
     pub fn new(font: Font, text: String) -> Self {
         Self {
             font,
-            text: text.clone(),
+            _text: text,
             size: Default::default(),
-            shaped_buffer: None,
+            _shaped_buffer: None,
         }
     }
 }
@@ -216,7 +212,7 @@ impl Widget for Text {
         let constraints = constraints.downcast_ref::<BoxConstraints>().unwrap();
         self.size = constraints.max_size;
 
-        let family = context.font_cache().font_family(self.font.family());
+        let _family = context.font_cache().font_family(self.font.family());
 
         self.size
     }

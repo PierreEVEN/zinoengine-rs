@@ -62,7 +62,7 @@ impl FontCache {
             }
         }
 
-        if let Ok(family) = self
+        if let Ok(_family) = self
             .asset_manager
             .load_sync(&Url::from_str(&format!("asset:///{}", uuid.to_string())).unwrap())
         {

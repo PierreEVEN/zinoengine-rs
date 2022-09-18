@@ -13,12 +13,11 @@ pub enum PixelFormat {
 
     R8Unorm,
 
-    R8G8B8Unorm,
     R8G8B8A8Unorm,
 }
 
 impl PixelFormat {
-    pub fn bytes_size(&self) -> u64 {
+    pub fn bytes_size(&self) -> usize {
         match self {
             PixelFormat::Unknown => 0,
             PixelFormat::B8G8R8A8UnormSrgb
@@ -26,13 +25,11 @@ impl PixelFormat {
             | PixelFormat::R8G8B8A8Unorm => 4,
 
             PixelFormat::R8Unorm => 1,
-
-            PixelFormat::R8G8B8Unorm => 3,
         }
     }
 
-    pub fn texture_size_in_bytes(&self, width: u32, height: u32) -> u64 {
-        (width as u64) * (height as u64) * self.bytes_size()
+    pub fn texture_size_in_bytes(&self, width: u32, height: u32) -> usize {
+        (width as usize) * (height as usize) * self.bytes_size()
     }
 }
 
@@ -47,7 +44,6 @@ impl Display for PixelFormat {
         match self {
             PixelFormat::B8G8R8A8UnormSrgb => write!(f, "BGRA 8-bit (unorm, sRGB)"),
             PixelFormat::B8G8R8A8Unorm => write!(f, "BGRA 8-bit (unorm)"),
-            PixelFormat::R8G8B8Unorm => write!(f, "RGB 8-bit (unorm)"),
             PixelFormat::R8G8B8A8Unorm => write!(f, "RGBA 8-bit (unorm)"),
             _ => write!(f, "{:?}", self),
         }

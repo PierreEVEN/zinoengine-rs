@@ -8,7 +8,7 @@ use ze_gfx::backend::{
     Device, MemoryLocation, ResourceState, ShaderResourceViewDesc, ShaderResourceViewResource,
     ShaderResourceViewType, Texture2DSRV, TextureDesc, TextureUsageFlags,
 };
-use ze_gfx::{utils, PixelFormat};
+use ze_gfx::utils;
 
 pub struct TextureLoader {
     device: Arc<dyn Device>,
@@ -39,7 +39,7 @@ impl AssetLoader for TextureLoader {
                 height: texture.height,
                 depth: texture.depth,
                 mip_levels: texture.mip_levels.len() as u32,
-                format: PixelFormat::R8G8B8A8Unorm,
+                format: texture.format,
                 sample_desc: Default::default(),
                 usage_flags: TextureUsageFlags::empty(),
                 memory_location: MemoryLocation::GpuOnly,
@@ -56,7 +56,7 @@ impl AssetLoader for TextureLoader {
             &texture.mip_levels[0],
             texture.width,
             texture.height,
-            4,
+            texture.format.bytes_size(),
             &texture_handle.unwrap(),
             ResourceState::Common,
         )

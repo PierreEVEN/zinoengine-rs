@@ -146,13 +146,13 @@ pub struct FreeTypeFontData {
     data: Vec<u8>,
 
     #[serde(skip_serializing)]
-    ft_face: Mutex<ze_freetype::Face>,
+    _ft_face: Mutex<ze_freetype::Face>,
 
     #[serde(skip_serializing)]
-    hb_face: Owned<harfbuzz_rs::Face<'static>>,
+    _hb_face: Owned<harfbuzz_rs::Face<'static>>,
 
     #[serde(skip_serializing)]
-    ft_library: Arc<Mutex<ze_freetype::Library>>,
+    _ft_library: Arc<Mutex<ze_freetype::Library>>,
 }
 
 impl FreeTypeFontData {
@@ -168,17 +168,17 @@ impl FreeTypeFontData {
         // FIXME: Find a better way instead of cloning
         let hb_face = harfbuzz_rs::Face::new(data.clone(), 0);
         Ok(Self {
-            ft_library,
+            _ft_library: ft_library,
             data,
-            ft_face: Mutex::new(ft_face),
-            hb_face,
+            _ft_face: Mutex::new(ft_face),
+            _hb_face: hb_face,
         })
     }
 }
 
 #[typetag::serde]
 impl FontFaceData for FreeTypeFontData {
-    fn glyph_bitmap(&self, glyph_index: u32) -> Option<GlyphBitmap> {
+    fn glyph_bitmap(&self, _: u32) -> Option<GlyphBitmap> {
         todo!()
     }
 
@@ -192,7 +192,7 @@ impl<'de> Deserialize<'de> for FreeTypeFontData {
     where
         D: Deserializer<'de>,
     {
-        let data: Vec<u8> = Deserialize::deserialize(deserializer)?;
+        let _: Vec<u8> = Deserialize::deserialize(deserializer)?;
 
         todo!()
     }

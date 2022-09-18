@@ -1,4 +1,5 @@
 ﻿use crate::Texture;
+use image::EncodableLayout;
 use image::{ColorType, ImageFormat};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -89,8 +90,7 @@ impl AssetImporter for TextureImporter {
         };
 
         let format = match image.color() {
-            ColorType::Rgb8 => PixelFormat::R8G8B8Unorm,
-            ColorType::Rgba8 => PixelFormat::R8G8B8A8Unorm,
+            ColorType::Rgb8 | ColorType::Rgba8 => PixelFormat::R8G8B8A8Unorm,
             _ => unimplemented!(),
         };
 
@@ -100,7 +100,7 @@ impl AssetImporter for TextureImporter {
             height: image.height(),
             depth: 1,
             format,
-            mip_levels: vec![image.into_bytes()],
+            mip_levels: vec![image.to_rgba8().as_bytes().to_vec()],
             texture: None,
             default_srv: None,
         };

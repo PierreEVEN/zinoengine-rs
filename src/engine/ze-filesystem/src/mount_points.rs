@@ -4,6 +4,7 @@
 };
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
+use percent_encoding::percent_decode_str;
 use std::collections::HashMap;
 use std::fs::{read_dir, File};
 use std::io::{ErrorKind, Read, Write};
@@ -100,10 +101,14 @@ impl StdMountPoint {
     }
 
     fn to_fs_path(&self, path: &Url) -> PathBuf {
+        let path = percent_decode_str(path.path())
+            .decode_utf8_lossy()
+            .to_string();
+
         // Because we use long paths we can't pass to std::fs functions any forward slashes
         // Only for Windows
         #[cfg(windows)]
-        let path = path.path().replace('/', "\\");
+        let path = path.replace('/', "\\");
 
         #[cfg(not(windows))]
         let path = path.path();
@@ -139,6 +144,7 @@ impl MountPoint for StdMountPoint {
                 &self.root.to_string_lossy(),
                 &entry.path().clone().canonicalize().unwrap(),
             );
+
             let path = make_url_for_zefs(self.alias(), &path).unwrap();
 
             let file_type = entry.file_type().unwrap();
