@@ -1,4 +1,5 @@
-﻿use cc::Build;
+﻿#[cfg(not(target_os = "windows"))]
+use cc::Build;
 use cmake::Config;
 use std::io;
 use std::path::Path;
@@ -13,7 +14,7 @@ fn main() -> io::Result<()> {
                 .define("IMGUI_STATIC", "ON")
                 .build();
 
-            println!("cargo:rustc-link-search=native={}/build", cmake.display());
+            println!("cargo:rustc-link-search=native={}", cmake.display());
         } else {
             let cimgui_dir = manifest_dir.join("third-party/cimgui");
             let imgui_dir = cimgui_dir.join("imgui");

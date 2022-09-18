@@ -54,6 +54,9 @@ impl AssetLoader for TextureLoader {
         utils::copy_data_to_texture(
             &self.device,
             &texture.mip_levels[0],
+            texture.width,
+            texture.height,
+            4,
             &texture_handle.unwrap(),
             ResourceState::Common,
         )

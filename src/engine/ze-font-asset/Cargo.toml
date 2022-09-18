@@ -1,5 +1,5 @@
 [package]
-name = "ze-ui"
+name = "ze-font-asset"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,11 +7,12 @@ edition = "2021"
 ze-core = { version = "0.1.0", path = "../ze-core" }
 ze-gfx = { version = "0.1.0", path = "../ze-gfx" }
 ze-asset-system = { version = "0.1.0", path = "../ze-asset-system" }
-ze-shader-system = { version = "0.1.0", path = "../ze-shader-system" }
+ze-reflection = { version = "0.1.0", path = "../ze-reflection" }
 ze-freetype = { version = "0.1.0", path = "../../third-party/ze-freetype" }
-ze-font-asset = { version = "0.1.0", path = "../ze-font-asset" }
-rand = "0.8.5"
-downcast-rs = "1.2.0"
-rectangle-pack = "0.4.2"
-enumflags2 = "0.7.5"
+url = "2.2.2"
+uuid = { version = "1.1.2", features = [ "v4" ] }
+serde = "1.0.140"
+serde_derive = "1.0.140"
 harfbuzz_rs = "2.0.1"
+parking_lot = "0.12.1"
+typetag = "0.2.3"

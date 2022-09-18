@@ -4,13 +4,13 @@ use sha2::Digest;
 use sha2::Sha256;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::path::Path;
 use std::sync::Arc;
 use url::Url;
 use uuid::Uuid;
 use ze_asset_system::importer::BoxedAssetImporter;
-use ze_asset_system::{AssetProvider, LoadError, ASSET_METADATA_EXTENSION};
+use ze_asset_system::{AssetLoadResult, AssetProvider, LoadError, ASSET_METADATA_EXTENSION};
 use ze_core::{ze_error, ze_info};
 use ze_filesystem::{FileSystem, IterDirFlagBits, IterDirFlags};
 
@@ -131,7 +131,7 @@ impl AssetServer {
         self.scan_asset_directories();
     }
 
-    pub fn get_asset_data(&self, uuid: Uuid) -> Result<(Uuid, Vec<u8>), Error> {
+    pub fn asset_data(&self, uuid: Uuid) -> Result<(Uuid, Vec<u8>), Error> {
         let data = match self.asset_db.get(uuid) {
             Ok(data) => data.unwrap(),
             Err(_) => return Err(Error::UnknownAsset),
@@ -283,9 +283,12 @@ impl AssetServerProvider {
 }
 
 impl AssetProvider for AssetServerProvider {
-    fn load(&self, uuid: Uuid, _: &Url) -> Result<(Uuid, Box<dyn Read>), LoadError> {
-        match self.asset_server.get_asset_data(uuid) {
-            Ok(data) => Ok((data.0, Box::new(Cursor::new(data.1)))),
+    fn load(&self, uuid: Uuid, _: &Url) -> Result<AssetLoadResult, LoadError> {
+        match self.asset_server.asset_data(uuid) {
+            Ok(data) => Ok(AssetLoadResult::Serialized(
+                data.0,
+                Box::new(Cursor::new(data.1)),
+            )),
             Err(_) => Err(LoadError::NotFound),
         }
     }

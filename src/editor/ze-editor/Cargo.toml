@@ -7,8 +7,6 @@ build = "build.rs"
 [[bin]]
 name = "ze-editor"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 ze-core = { version = "0.1.0", path = "../../engine/ze-core" }
 ze-platform = { version = "0.1.0", path = "../../engine/ze-platform" }
@@ -24,7 +22,7 @@ ze-imgui = { version = "0.1.0", path = "../../engine/ze-imgui" }
 ze-render-graph = { version = "0.1.0", path = "../../engine/ze-render-graph" }
 ze-asset-editor = { version = "0.1.0", path = "../ze-asset-editor" }
 ze-texture-editor = { version = "0.1.0", path = "../ze-texture-editor" }
-ze-ui = { version = "0.1.0", path = "../../engine/ze-ui" }
+ze-font-asset = { version = "0.1.0", path = "../../engine/ze-font-asset" }
 url = "2.2.2"
 enumflags2 = "0.7.5"
 parking_lot = "0.12.1"
@@ -32,9 +30,9 @@ image = "0.24.2"
 cfg-if = "1.0.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-ze-windows-platform = { version = "0.1.0", path = "../../engine/ze-windows-platform" }
-ze-d3d12-shader-compiler = { version = "0.1.0", path = "../../engine/ze-d3d12-shader-compiler" }
-ze-d3d12-backend = { version = "0.1.0", path = "../../engine/ze-d3d12-backend" }
+ze-windows-platform = { version = "0.1.0", path = "../../engine/windows/ze-windows-platform" }
+ze-d3d12-shader-compiler = { version = "0.1.0", path = "../../engine/windows/ze-d3d12-shader-compiler" }
+ze-d3d12-backend = { version = "0.1.0", path = "../../engine/windows/ze-d3d12-backend" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 ze-macos-platform = { version = "0.1.0", path = "../../engine/macos/ze-macos-platform" }

@@ -169,7 +169,11 @@ pub struct BufferCopyRegion {
 }
 
 pub struct BufferToTextureCopyRegion {
-    pub buffer_offset: u64,
+    pub buffer_offset_in_bytes: u64,
+    pub buffer_texture_width: u32,
+    pub buffer_texture_height: u32,
+    pub buffer_texture_depth: u32,
+    pub buffer_texture_row_pitch_in_bytes: u32,
     pub texture_subresource_index: u32,
     pub texture_subresource_layout: TextureSubresourceLayout,
     pub texture_subresource_width: u32,

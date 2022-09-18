@@ -11,6 +11,8 @@ pub enum PixelFormat {
     B8G8R8A8UnormSrgb,
     B8G8R8A8Unorm,
 
+    R8Unorm,
+
     R8G8B8Unorm,
     R8G8B8A8Unorm,
 }
@@ -22,6 +24,9 @@ impl PixelFormat {
             PixelFormat::B8G8R8A8UnormSrgb
             | PixelFormat::B8G8R8A8Unorm
             | PixelFormat::R8G8B8A8Unorm => 4,
+
+            PixelFormat::R8Unorm => 1,
+
             PixelFormat::R8G8B8Unorm => 3,
         }
     }

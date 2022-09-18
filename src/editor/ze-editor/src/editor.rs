@@ -3,6 +3,7 @@ use crate::console::Console;
 use crate::icon_manager::IconManager;
 use cfg_if::cfg_if;
 use enumflags2::make_bitflags;
+use parking_lot::Mutex;
 use std::env;
 use std::path::Path;
 use std::str::FromStr;
@@ -10,14 +11,15 @@ use std::sync::{Arc, Weak};
 use std::time::Instant;
 use url::Url;
 use ze_asset_server::{AssetServer, AssetServerProvider};
+use ze_asset_system::Asset;
 use ze_asset_system::AssetManager;
-use ze_core::maths::Vec2f32;
-use ze_core::type_uuid::TypeUuid;
+use ze_core::maths::{Vec2f32, Vec2u32};
+use ze_core::type_uuid::{TypeUuid, Uuid};
 use ze_core::ze_info;
 use ze_filesystem::mount_points::StdMountPoint;
 use ze_filesystem::FileSystem;
 use ze_gfx::backend::*;
-use ze_gfx::PixelFormat;
+use ze_gfx::{utils, PixelFormat};
 use ze_imgui::Context;
 use ze_jobsystem::JobSystem;
 use ze_platform::{Message, Platform, Window, WindowFlagBits};
@@ -27,11 +29,6 @@ use ze_shader_compiler::ShaderCompiler;
 use ze_shader_system::ShaderManager;
 use ze_texture_asset::importer::TextureImporter;
 use ze_texture_asset::loader::TextureLoader;
-use ze_ui::renderer::ViewportRenderer;
-use ze_ui::widgets::ColumnSlot;
-use ze_ui::widgets::RowSlot;
-use ze_ui::widgets::{Column, EdgeInsets, Row};
-use ze_ui::{ze_ui_decl, UiState};
 
 #[cfg(target_os = "windows")]
 use ze_windows_platform::WindowsPlatform;
@@ -173,7 +170,7 @@ impl EditorApplication {
             .unwrap(),
         );
 
-        asset_server.add_importer(&["png"], TextureImporter::default());
+        asset_server.add_importer(&["png", "jpg", "jpeg"], TextureImporter::default());
 
         let asset_manager = Arc::new(AssetManager::default());
         asset_manager.add_provider(AssetServerProvider::new(asset_server.clone()), 1);
@@ -197,58 +194,12 @@ impl EditorApplication {
 
         let console = Console::new();
 
-        let mut ui_state = UiState::default();
-
-        let flex = ze_ui_decl! {
-            Column
-            + ColumnSlot()
-            .padding(EdgeInsets::all(10.0).into())
-            {
-                Row
-                + RowSlot()
-                .padding(EdgeInsets::all(10.0).into())
-                {
-                    Row
-                    + RowSlot()
-                    .padding(EdgeInsets::all(10.0).into())
-                    {
-                        Row
-                    }
-                    + RowSlot()
-                    .padding(EdgeInsets::all(10.0).into())
-                    {
-                        Row
-                    }
-                }
-                + RowSlot()
-                .padding(EdgeInsets::all(10.0).into())
-                {
-                    Row
-                }
-                + RowSlot()
-                .padding(EdgeInsets::all(10.0).into())
-                {
-                    Row
-                }
-            }
-            + ColumnSlot()
-            .padding(EdgeInsets::all(10.0).into())
-            {
-                Column
-            }
-        };
-
-        ui_state.set_root_widget(Some(flex));
-
-        let mut viewport_renderer =
-            ViewportRenderer::new(self.device.clone(), self.shader_manager.clone());
-
         while running {
             let delta_time = previous.elapsed().as_secs_f32();
             previous = Instant::now();
 
             while let Some(message) = self.platform.poll_event() {
-                //self.imgui.send_platform_message(&message);
+                self.imgui.send_platform_message(&message);
                 match message {
                     Message::WindowClosed(event_window) => {
                         if Weak::ptr_eq(&event_window, &Arc::downgrade(&self.main_window)) {
@@ -267,7 +218,6 @@ impl EditorApplication {
 
             self.device.begin_frame();
 
-            /*
             self.imgui.begin_frame(
                 delta_time,
                 self.platform.mouse_position(),
@@ -291,17 +241,7 @@ impl EditorApplication {
             asset_editor_manager.draw_editors(&mut self.imgui, main_dockspace_id);
             console.draw(&mut self.imgui);
 
-            // FIXME: ZEUI DEBUGGING
-            if self
-                .imgui
-                .begin_window("zeui debugging", WindowFlags::empty())
-            {
-                let debug = format!("{:#?}", ui_state);
-                self.imgui.text(&debug);
-            }
-            self.imgui.end_window();
             self.imgui.end_frame();
-            */
             // Render
 
             let swapchain = self.main_window_swapchain.as_ref().unwrap();
@@ -336,21 +276,25 @@ impl EditorApplication {
                     );
                 },
                 |_, cmd_list| {
-                    //self.imgui
-                    //    .draw_viewport(cmd_list, self.imgui.main_viewport());
-                    viewport_renderer.draw(
+                    self.imgui
+                        .draw_viewport(cmd_list, self.imgui.main_viewport());
+                    /*viewport_renderer.draw(
                         delta_time,
                         &mut ui_state,
                         cmd_list,
+                        &mut glyph_cache,
+                        &mut font_cache,
                         Vec2f32::new(swapchain.info.width as f32, swapchain.info.height as f32),
+
                     );
+                    */
                 },
             );
 
             render_graph.compile("backbuffer");
             render_graph.execute(&mut main_cmd_list);
 
-            //self.imgui.draw_non_main_viewports(&mut main_cmd_list);
+            self.imgui.draw_non_main_viewports(&mut main_cmd_list);
             self.device
                 .submit(QueueType::Graphics, &[&main_cmd_list], &[], &[]);
             self.device.present(swapchain);

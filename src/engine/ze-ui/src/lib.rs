@@ -1,6 +1,11 @@
+use crate::font::FontCache;
 use crate::renderer::DrawContext;
 use downcast_rs::{impl_downcast, Downcast};
+use std::cell::RefCell;
 use std::fmt::Debug;
+use std::rc::Rc;
+use std::sync::Arc;
+use ze_asset_system::AssetManager;
 use ze_core::maths::Vec2f32;
 
 #[derive(PartialEq, Eq, Copy, Clone, Hash)]
@@ -30,21 +35,30 @@ impl BoxConstraints {
 
 impl Constraints for BoxConstraints {}
 
-pub trait RenderNode {
-    /// Layout the widget with the given constraints from the parent
-    /// Default implementation position the first child
-    fn layout(&mut self, constraints: &dyn Constraints) -> Vec2f32;
-    fn draw(&self, draw_context: &mut DrawContext, position: Vec2f32);
+pub struct LayoutContext<'a> {
+    font_cache: &'a mut FontCache,
 }
 
-pub type WidgetUniqueId = usize;
+impl<'a> LayoutContext<'a> {
+    pub fn new(font_cache: &'a mut FontCache) -> Self {
+        Self { font_cache }
+    }
+
+    pub fn font_cache(&mut self) -> &mut FontCache {
+        self.font_cache
+    }
+}
 
 /// A widget is an object composing the UI
 pub trait Widget {
     /// Layout the widget with the given constraints from the parent
     /// Default implementation position the first child
-    fn layout(&mut self, constraints: &dyn Constraints) -> Vec2f32;
-    fn draw(&self, draw_context: &mut DrawContext, position: Vec2f32);
+    fn layout(
+        &mut self,
+        layout_context: &mut LayoutContext,
+        constraints: &dyn Constraints,
+    ) -> Vec2f32;
+    fn draw(&mut self, context: &mut DrawContext, position: Vec2f32);
 }
 
 #[derive(Default)]
@@ -57,10 +71,16 @@ impl UiState {
         self.root_widget = widget;
     }
 
-    pub fn draw(&mut self, _: f32, draw_context: &mut DrawContext, viewport_size: Vec2f32) {
+    pub fn draw(
+        &mut self,
+        _: f32,
+        layout_context: &mut LayoutContext,
+        draw_context: &mut DrawContext,
+        viewport_size: Vec2f32,
+    ) {
         if let Some(root_widget) = &mut self.root_widget {
             let constraints = BoxConstraints::new(viewport_size, viewport_size);
-            root_widget.layout(&constraints);
+            root_widget.layout(layout_context, &constraints);
             root_widget.draw(draw_context, Vec2f32::default());
         }
     }
@@ -70,7 +90,7 @@ impl UiState {
 #[macro_export]
 macro_rules! ze_ui_decl {
     (
-        $widget_type:ident
+        $widget_type:ident()
         $(.$widget_param_name:ident($widget_param_content:expr))*
         $(+ $slot_type:ident()
             $(.$slot_name:ident($slot_param:expr))*
@@ -93,6 +113,8 @@ macro_rules! ze_ui_decl {
     };
 }
 
+pub mod font;
+pub mod glyph_cache;
 pub mod property;
 pub mod renderer;
 pub mod widgets;

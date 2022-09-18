@@ -1,5 +1,8 @@
-﻿use crate::UiState;
+﻿use crate::font::Font;
+use crate::{LayoutContext, UiState};
+use harfbuzz_rs::{GlyphBuffer, UnicodeBuffer};
 use std::mem::size_of;
+use std::rc::Rc;
 use std::slice;
 use std::sync::Arc;
 use ze_core::color::Color4f32;
@@ -43,14 +46,23 @@ pub struct DrawCommand {
 }
 
 /// Hold context for drawing into a viewport
-#[derive(Default)]
-pub struct DrawContext {
+pub struct DrawContext<'a> {
+    glyph_cache: &'a mut crate::glyph_cache::Cache,
     commands: Vec<DrawCommand>,
     vertices: Vec<Vertex>,
     indices: Vec<u16>,
 }
 
-impl DrawContext {
+impl<'a> DrawContext<'a> {
+    pub fn new(glyph_cache: &'a mut crate::glyph_cache::Cache) -> Self {
+        Self {
+            glyph_cache,
+            commands: vec![],
+            vertices: vec![],
+            indices: vec![],
+        }
+    }
+
     fn sort(&mut self) -> Vec<Vec<usize>> {
         let mut batches = vec![];
         if !self.commands.is_empty() {
@@ -154,6 +166,33 @@ impl DrawContext {
         self.commands.last_mut().unwrap()
     }
 
+    pub fn text(&mut self, position: Vec2f32, font: &Font, shaped_buffer: &GlyphBuffer) {
+        let glyph_positions = shaped_buffer.get_glyph_positions();
+        let glyph_infos = shaped_buffer.get_glyph_infos();
+        let mut current_advance_x = 0.0;
+        let mut current_advance_y = 0.0;
+        /*for (info, glyph_position) in glyph_infos.iter().zip(glyph_positions) {
+            let cached_glyph = self
+                .glyph_cache
+                .glyph(font.hash(), font.glyph_index(info.codepoint));
+
+            self.rectangle(
+                position
+                    + Vec2f32::new(
+                        current_advance_x + glyph_position.x_offset as f32,
+                        current_advance_y + glyph_position.y_offset as f32,
+                    ),
+                Vec2f32::new(4.0, 32.0),
+                Color4f32::new(current_advance_x / 10.0, 0.0, 1.0, 1.0),
+                None,
+            );
+
+            current_advance_x += glyph_position.x_advance as f32;
+            current_advance_y += glyph_position.y_advance as f32;
+        }
+        */
+    }
+
     fn reserve_vertex_and_index_slice(
         &mut self,
         vertex_count: usize,
@@ -182,6 +221,10 @@ impl DrawContext {
                 &mut self.indices[index_start_idx..index_start_idx + index_count],
             ),
         )
+    }
+
+    fn glyph_cache(&mut self) -> &mut crate::glyph_cache::Cache {
+        self.glyph_cache
     }
 }
 
@@ -308,10 +351,18 @@ impl ViewportRenderer {
         delta_time: f32,
         ui_state: &mut UiState,
         cmd_list: &mut CommandList,
+        glyph_cache: &mut crate::glyph_cache::Cache,
+        font_cache: &mut crate::font::FontCache,
         viewport_size: Vec2f32,
     ) {
-        let mut draw_context = DrawContext::default();
-        ui_state.draw(delta_time, &mut draw_context, viewport_size);
+        let mut layout_context = LayoutContext::new(font_cache);
+        let mut draw_context = DrawContext::new(glyph_cache);
+        ui_state.draw(
+            delta_time,
+            &mut layout_context,
+            &mut draw_context,
+            viewport_size,
+        );
 
         let sorted_commands = draw_context.sort();
         let batches = self.generate_batches(&draw_context, sorted_commands);

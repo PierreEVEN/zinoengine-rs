@@ -3,11 +3,9 @@ name = "ze-windows-platform"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-ze-core = { version = "0.1.0", path = "../ze-core" }
-ze-platform = { version = "0.1.0", path = "../ze-platform" }
+ze-core = { version = "0.1.0", path = "../../ze-core" }
+ze-platform = { version = "0.1.0", path = "../../ze-platform" }
 windows = { version = "0.37.0", features = [ 
     "Win32", 
     "Win32_Foundation", 

@@ -119,6 +119,9 @@ impl Context {
             utils::copy_data_to_texture(
                 &device,
                 slice::from_raw_parts(pixels, (width * height * 4) as usize),
+                width as u32,
+                height as u32,
+                4,
                 &texture,
                 ResourceState::Common,
             )

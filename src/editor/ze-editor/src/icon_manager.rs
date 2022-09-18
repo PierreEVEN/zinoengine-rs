@@ -77,6 +77,9 @@ impl IconManager {
                 copy_data_to_texture(
                     &self.device,
                     image.as_bytes(),
+                    texture.desc.width,
+                    texture.desc.height,
+                    4,
                     &texture,
                     ResourceState::Common,
                 )

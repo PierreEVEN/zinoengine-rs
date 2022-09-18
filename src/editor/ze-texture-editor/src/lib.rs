@@ -162,7 +162,7 @@ impl AssetEditorFactory for EditorFactory {
     fn open(&self, asset: Uuid) -> Box<dyn AssetEditor> {
         let texture = self
             .asset_manager
-            .load(&Url::from_str(&format!("assets:///{}", asset)).unwrap())
+            .load_sync(&Url::from_str(&format!("assets:///{}", asset)).unwrap())
             .unwrap();
 
         Box::new(Editor {

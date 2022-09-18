@@ -3,8 +3,6 @@ name = "ze-gfx"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 ze-core = { version = "0.1.0", path = "../ze-core" }
 ze-reflection = { version = "0.1.0", path = "../ze-reflection" }

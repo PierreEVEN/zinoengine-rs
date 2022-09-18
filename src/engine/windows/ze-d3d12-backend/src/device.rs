@@ -886,13 +886,13 @@ impl Device for D3D12Device {
                 Type: D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
                 Anonymous: D3D12_TEXTURE_COPY_LOCATION_0 {
                     PlacedFootprint: D3D12_PLACED_SUBRESOURCE_FOOTPRINT {
-                        Offset: region.texture_subresource_layout.offset_in_bytes,
+                        Offset: region.buffer_offset_in_bytes,
                         Footprint: D3D12_SUBRESOURCE_FOOTPRINT {
                             Format: get_dxgi_format_from_ze_format(dst_texture.desc.format),
-                            Width: region.texture_subresource_width as u32,
-                            Height: region.texture_subresource_height as u32,
-                            Depth: region.texture_subresource_depth as u32,
-                            RowPitch: region.texture_subresource_layout.row_pitch_in_bytes as u32,
+                            Width: region.buffer_texture_width as u32,
+                            Height: region.buffer_texture_height as u32,
+                            Depth: region.buffer_texture_depth as u32,
+                            RowPitch: region.buffer_texture_row_pitch_in_bytes as u32,
                         },
                     },
                 },

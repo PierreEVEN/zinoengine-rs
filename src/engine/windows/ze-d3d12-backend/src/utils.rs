@@ -62,6 +62,7 @@ pub fn get_dxgi_format_from_ze_format(format: PixelFormat) -> DXGI_FORMAT {
         PixelFormat::Unknown => DXGI_FORMAT_UNKNOWN,
         PixelFormat::B8G8R8A8UnormSrgb => DXGI_FORMAT_B8G8R8A8_UNORM_SRGB,
         PixelFormat::B8G8R8A8Unorm => DXGI_FORMAT_B8G8R8A8_UNORM,
+        PixelFormat::R8Unorm => DXGI_FORMAT_R8_UNORM,
         PixelFormat::R8G8B8A8Unorm => DXGI_FORMAT_R8G8B8A8_UNORM,
         _ => todo!(),
     }
@@ -72,6 +73,7 @@ pub fn get_ze_format_from_dxgi_format(format: DXGI_FORMAT) -> PixelFormat {
         DXGI_FORMAT_UNKNOWN => PixelFormat::Unknown,
         DXGI_FORMAT_B8G8R8A8_UNORM_SRGB => PixelFormat::B8G8R8A8UnormSrgb,
         DXGI_FORMAT_B8G8R8A8_UNORM => PixelFormat::B8G8R8A8Unorm,
+        DXGI_FORMAT_R8_UNORM => PixelFormat::R8Unorm,
         DXGI_FORMAT_R8G8B8A8_UNORM => PixelFormat::R8G8B8A8Unorm,
         _ => todo!(),
     }

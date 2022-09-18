@@ -74,6 +74,9 @@ pub fn copy_data_to_buffer(
 pub fn copy_data_to_texture(
     device: &Arc<dyn Device>,
     data: &[u8],
+    src_width: u32,
+    src_height: u32,
+    src_row_pitch_in_bytes: usize,
     texture: &Texture,
     dst_resource_state: ResourceState,
 ) -> Result<(), DeviceError> {
@@ -88,7 +91,7 @@ pub fn copy_data_to_texture(
     let subresource_layout = device.texture_subresource_layout(texture, 0);
     let staging = device.create_buffer(
         &BufferDesc {
-            size_bytes: subresource_layout.size_in_bytes,
+            size_bytes: data.len() as u64,
             usage: BufferUsageFlags::default(),
             memory_location: MemoryLocation::CpuToGpu,
             default_resource_state: ResourceState::CopyRead,
@@ -98,15 +101,15 @@ pub fn copy_data_to_texture(
 
     let buffer_data = device.buffer_mapped_ptr(&staging).unwrap();
     unsafe {
-        let width = texture.desc.width as usize;
-        let height = texture.desc.height as usize;
+        let width = src_width as usize;
+        let height = src_height as usize;
         let row_pitch = subresource_layout.row_pitch_in_bytes as usize;
 
         for y in 0..height {
             ptr::copy_nonoverlapping(
-                data.as_ptr().add(y * row_pitch),
-                buffer_data.add(y * width * 4),
-                width * 4,
+                data.as_ptr().add(y * width * src_row_pitch_in_bytes),
+                buffer_data.add(y * row_pitch),
+                width * src_row_pitch_in_bytes,
             );
         }
     }
@@ -117,7 +120,11 @@ pub fn copy_data_to_texture(
         &staging,
         texture,
         &[BufferToTextureCopyRegion {
-            buffer_offset: 0,
+            buffer_offset_in_bytes: 0,
+            buffer_texture_width: src_width,
+            buffer_texture_height: src_height,
+            buffer_texture_depth: 1,
+            buffer_texture_row_pitch_in_bytes: subresource_layout.row_pitch_in_bytes as u32,
             texture_subresource_index: 0,
             texture_subresource_layout: subresource_layout,
             texture_subresource_width: texture.desc.width,

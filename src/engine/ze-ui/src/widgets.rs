@@ -1,8 +1,13 @@
-﻿use crate::property::Property;
+﻿use crate::font::Font;
+use crate::property::Property;
 use crate::renderer::DrawContext;
-use crate::{BoxConstraints, Constraints, Widget};
+use crate::{BoxConstraints, Constraints, LayoutContext, Widget};
+use harfbuzz_rs::{GlyphBuffer, UnicodeBuffer};
 use rand::{thread_rng, Rng};
 use std::ops::Deref;
+use std::rc::Rc;
+use std::str::FromStr;
+use ze_asset_system::url::Url;
 use ze_core::color::Color4f32;
 use ze_core::maths::Vec2f32;
 
@@ -80,7 +85,7 @@ impl<const IS_VERTICAL: bool> Flex<IS_VERTICAL> {
 }
 
 impl<const IS_VERTICAL: bool> Widget for Flex<IS_VERTICAL> {
-    fn layout(&mut self, constraints: &dyn Constraints) -> Vec2f32 {
+    fn layout(&mut self, context: &mut LayoutContext, constraints: &dyn Constraints) -> Vec2f32 {
         let constraints = constraints.downcast_ref::<BoxConstraints>().unwrap();
         self.size = constraints.max_size;
 
@@ -98,16 +103,16 @@ impl<const IS_VERTICAL: bool> Widget for Flex<IS_VERTICAL> {
             let constraints =
                 BoxConstraints::new(child_size - padding_offset, child_size - padding_offset);
 
-            self.children_sizes[i] = child.widget.layout(&constraints);
+            self.children_sizes[i] = child.widget.layout(context, &constraints);
         }
 
         self.size
     }
 
-    fn draw(&self, draw_context: &mut DrawContext, mut position: Vec2f32) {
+    fn draw(&mut self, draw_context: &mut DrawContext, mut position: Vec2f32) {
         draw_context.rectangle(position, self.size, self.debug_color, None);
 
-        for (i, child) in self.children.iter().enumerate() {
+        for (i, child) in self.children.iter_mut().enumerate() {
             let padding = child.padding.get();
             let padding = Vec2f32::new(padding.left, padding.top);
 
@@ -159,5 +164,71 @@ impl EdgeInsets {
             right: value,
             bottom: value,
         }
+    }
+}
+
+#[derive(Default)]
+pub struct TextBuilder {
+    font: Option<Font>,
+    text: Option<String>,
+}
+
+impl TextBuilder {
+    pub fn text(mut self, text: &str) -> Self {
+        self.text = Some(text.to_string());
+        self
+    }
+
+    pub fn font(mut self, font: Font) -> Self {
+        self.font = Some(font);
+        self
+    }
+
+    pub fn build(self) -> Box<dyn Widget> {
+        Box::new(Text::new(self.font.unwrap(), self.text.unwrap()))
+    }
+}
+
+pub struct Text {
+    font: Font,
+    text: String,
+    size: Vec2f32,
+    shaped_buffer: Option<GlyphBuffer>,
+}
+
+impl Text {
+    pub fn builder() -> TextBuilder {
+        TextBuilder::default()
+    }
+
+    pub fn new(font: Font, text: String) -> Self {
+        Self {
+            font,
+            text: text.clone(),
+            size: Default::default(),
+            shaped_buffer: None,
+        }
+    }
+}
+
+impl Widget for Text {
+    fn layout(&mut self, context: &mut LayoutContext, constraints: &dyn Constraints) -> Vec2f32 {
+        let constraints = constraints.downcast_ref::<BoxConstraints>().unwrap();
+        self.size = constraints.max_size;
+
+        let family = context.font_cache().font_family(self.font.family());
+
+        self.size
+    }
+
+    fn draw(&mut self, draw_context: &mut DrawContext, position: Vec2f32) {
+        draw_context.rectangle(
+            position,
+            self.size,
+            Color4f32::new(0.0, 0.0, 0.0, 1.0),
+            None,
+        );
+
+        //draw_context.text(position, &self.font, self.shaped_buffer.as_ref().unwrap())
     }
 }
