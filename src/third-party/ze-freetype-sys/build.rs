@@ -27,6 +27,7 @@ fn main() {
             out_dir.join("include/freetype2").to_string_lossy()
         ))
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .generate_comments(false)
         .generate()
         .expect("Failed to generate bindings");
 
