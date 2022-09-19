@@ -2,9 +2,10 @@
 
 An attempt to make a 3D game engine in Rust.
 
-| Platform | CI Status                                                                                |
-|----------|------------------------------------------------------------------------------------------|
-| Windows  | ![WinCI](https://github.com/Zino2201/zinoengine-rs/actions/workflows/rust.yml/badge.svg) |
+| Platform | CI Status                                                                                         |
+|----------|---------------------------------------------------------------------------------------------------|
+| Windows  | ![WinCI](https://github.com/Zino2201/zinoengine-rs/actions/workflows/build_windows.yml/badge.svg) |
+| macOS  | ![WinCI](https://github.com/Zino2201/zinoengine-rs/actions/workflows/build_macos.yml/badge.svg) |
 
 ## How to compile (Windows)
 - Clone the project and its submodules
