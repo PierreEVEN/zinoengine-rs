@@ -8,3 +8,4 @@ asset-cache/
 *.o
 *.DotSettings.user
 imgui.ini
+.DS_Store

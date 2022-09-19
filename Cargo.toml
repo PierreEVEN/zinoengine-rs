@@ -1,3 +1,8 @@
 [workspace]
-members = ["src/editor/*", "src/engine/*", "src/engine/macos/*", "src/engine/windows/*", "src/third-party/*"]
-exclude = ["src/engine/macos", "src/engine/windows"]
+members = ["src/editor/*", 
+    "src/engine/*", 
+    "src/engine/macos/*", 
+    "src/engine/windows/*", 
+    "src/third-party/*"]
+exclude = ["src/engine/macos", "src/engine/windows", 
+    "src/engine/ze-ui"]

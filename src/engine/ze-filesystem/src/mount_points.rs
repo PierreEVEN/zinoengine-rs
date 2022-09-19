@@ -110,9 +110,6 @@ impl StdMountPoint {
         #[cfg(windows)]
         let path = path.replace('/', "\\");
 
-        #[cfg(not(windows))]
-        let path = path.path();
-
         let path = format!("{}{}", self.root.to_string_lossy(), path);
         PathBuf::from_str(&path).unwrap()
     }

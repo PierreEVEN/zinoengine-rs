@@ -135,7 +135,7 @@ impl Library {
         unsafe {
             let mut library = std::ptr::null_mut();
             let error = FT_Init_FreeType(&mut library);
-            if error == FT_Err_Ok {
+            if error == FT_Err_Ok as _ {
                 Ok(Self { library })
             } else {
                 Err(error.into())
@@ -147,8 +147,8 @@ impl Library {
         unsafe {
             let mut face = std::ptr::null_mut();
             let c_file = CString::new(path)?;
-            let error = FT_New_Face(self.library, c_file.as_ptr(), face_index, &mut face);
-            if error == FT_Err_Ok {
+            let error = FT_New_Face(self.library, c_file.as_ptr(), face_index as _, &mut face);
+            if error == FT_Err_Ok as _ {
                 Ok(Face { face })
             } else {
                 Err(error.into())
@@ -163,10 +163,10 @@ impl Library {
                 self.library,
                 data.as_ptr(),
                 data.len().try_into().unwrap(),
-                face_index,
+                face_index as _,
                 &mut face,
             );
-            if error == FT_Err_Ok {
+            if error == FT_Err_Ok as _ {
                 Ok(Face { face })
             } else {
                 Err(mem::transmute(error))
@@ -210,7 +210,19 @@ pub enum LoadFlagBits {
 }
 pub type LoadFlags = BitFlags<LoadFlagBits>;
 
+#[cfg(windows)]
 #[repr(i32)]
+pub enum RenderMode {
+    Normal = FT_Render_Mode__FT_RENDER_MODE_NORMAL,
+    Light = FT_Render_Mode__FT_RENDER_MODE_LIGHT,
+    Mono = FT_Render_Mode__FT_RENDER_MODE_MONO,
+    Lcd = FT_Render_Mode__FT_RENDER_MODE_LCD,
+    LcdV = FT_Render_Mode__FT_RENDER_MODE_LCD_V,
+    Sdf = FT_Render_Mode__FT_RENDER_MODE_SDF,
+}
+
+#[cfg(not(windows))]
+#[repr(u32)]
 pub enum RenderMode {
     Normal = FT_Render_Mode__FT_RENDER_MODE_NORMAL,
     Light = FT_Render_Mode__FT_RENDER_MODE_LIGHT,
@@ -231,7 +243,7 @@ impl Face {
     pub fn load_glyph(&self, glyph_index: u32, load_flags: LoadFlags) -> Result<(), Error> {
         unsafe { FT_Set_Pixel_Sizes(self.face, 0, 48) };
         let error = unsafe { FT_Load_Glyph(self.face, glyph_index, load_flags.bits() as i32) };
-        if error == FT_Err_Ok {
+        if error == FT_Err_Ok as _ {
             Ok(())
         } else {
             Err(error.into())
@@ -239,8 +251,8 @@ impl Face {
     }
 
     pub fn render_glyph(&self, render_mode: RenderMode) -> Result<GlyphSlot, Error> {
-        let error = unsafe { FT_Render_Glyph((*self.face).glyph, render_mode as i32) };
-        if error == FT_Err_Ok {
+        let error = unsafe { FT_Render_Glyph((*self.face).glyph, render_mode as _) };
+        if error == FT_Err_Ok as _ {
             Ok(self.glyph_slot())
         } else {
             Err(error.into())
@@ -248,15 +260,15 @@ impl Face {
     }
 
     pub fn char_index(&self, charcode: u32) -> u32 {
-        unsafe { FT_Get_Char_Index(self.face, charcode) }
+        unsafe { FT_Get_Char_Index(self.face, charcode as _) as _ }
     }
 
     pub fn glyph_slot(&self) -> GlyphSlot {
         GlyphSlot(unsafe { (*self.face).glyph })
     }
 
-    pub fn num_glyphs(&self) -> i32 {
-        unsafe { (*self.face).num_glyphs }
+    pub fn num_glyphs(&self) -> u32 {
+        unsafe { (*self.face).num_glyphs as _ }
     }
 
     pub fn num_fixed_sizes(&self) -> i32 {
