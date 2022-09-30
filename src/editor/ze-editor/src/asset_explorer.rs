@@ -156,7 +156,8 @@ impl AssetExplorer {
                         self.current_directory = entry.url.clone();
                     } else if let Some(uuid) = self.asset_server.asset_uuid_from_url(&entry.url) {
                         if let Some(type_uuid) = self.asset_server.asset_type_uuid(uuid) {
-                            self.asset_editor_manager.open_asset(type_uuid, uuid);
+                            self.asset_editor_manager
+                                .open_asset(type_uuid, uuid, &entry.url);
                         }
                     }
                 }

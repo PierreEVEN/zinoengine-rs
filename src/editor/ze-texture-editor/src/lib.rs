@@ -3,24 +3,27 @@ use std::str::FromStr;
 use std::sync::Arc;
 use url::Url;
 use uuid::Uuid;
-use ze_asset_editor::{AssetEditor, AssetEditorFactory};
+use ze_asset_editor::{AssetEditor, AssetEditorDrawContext, AssetEditorFactory};
+use ze_asset_system::importer::SourceAssetMetadata;
 use ze_asset_system::{Asset, AssetManager};
+use ze_filesystem::FileSystem;
 use ze_imgui::ze_imgui_sys::{ImVec2, ImVec4};
 use ze_imgui::{
     Context, TableColumnFlagBits, TableColumnFlags, TableFlagBits, WindowFlagBits, WindowFlags,
 };
 use ze_property_editor::draw_property_editor;
-use ze_reflection::*;
 use ze_texture_asset::Texture;
 
 pub struct Editor {
     uuid: Uuid,
+    _source_url: Url,
+    metadata_url: Url,
     texture: Arc<dyn Asset>,
-    import_parameters: ze_texture_asset::importer::Parameters,
+    metadata: SourceAssetMetadata<(), ze_texture_asset::importer::Parameters>,
 }
 
 impl Editor {
-    fn draw_properties(&mut self, imgui: &mut Context) {
+    fn draw_properties(&mut self, imgui: &mut Context) -> bool {
         let texture = self.texture.downcast_ref::<Texture>().unwrap();
 
         imgui.text(&format!(
@@ -45,40 +48,12 @@ impl Editor {
         imgui.text("Importer Parameters");
         imgui.dummy(ImVec2::new(0.0, 3.0));
 
-        let parameters_type_desc = ze_texture_asset::importer::Parameters::type_desc();
-        let _parameters_type_desc_data: &StructDescription = parameters_type_desc.data_as_struct();
-
-        /*
-        imgui.begin_table(
-            "PropertiesTable",
-            2,
-            make_bitflags! { TableFlagBits::{Resizable | NoBordersInBodyUntilResize} },
-            imgui.available_content_region(),
-        );
-
-        imgui.table_setup_column(
-            "Name",
-            0.25,
-            TableColumnFlags::from_flag(TableColumnFlagBits::WidthStretch),
-        );
-
-        imgui.table_setup_column(
-            "Value",
-            0.75,
-            TableColumnFlags::from_flag(TableColumnFlagBits::WidthStretch),
-        );
-        */
-
-        //imgui.table_next_row();
-        //imgui.table_next_column();
-        draw_property_editor(imgui, &mut self.import_parameters);
-
-        //imgui.end_table();
+        draw_property_editor(imgui, self.metadata.parameters_mut())
     }
 }
 
 impl AssetEditor for Editor {
-    fn draw(&mut self, imgui: &mut Context) {
+    fn draw(&mut self, imgui: &mut Context, context: &mut AssetEditorDrawContext) {
         let texture = self.texture.downcast_ref::<Texture>().unwrap();
         if imgui.begin_table(
             "MainTable",
@@ -135,11 +110,26 @@ impl AssetEditor for Editor {
                 false,
                 make_bitflags!(WindowFlagBits::{AlwaysUseWindowPadding}),
             ) {
-                self.draw_properties(imgui);
+                if self.draw_properties(imgui) {
+                    context.mark_as_unsaved();
+                }
                 imgui.end_child();
             }
 
             imgui.end_table();
+        }
+    }
+
+    fn save(&self, filesystem: &FileSystem) -> bool {
+        let yaml = match serde_yaml::to_string(&self.metadata) {
+            Ok(str) => str,
+            Err(_) => return false,
+        };
+
+        if let Ok(mut metadata_file) = filesystem.write(&self.metadata_url) {
+            metadata_file.write_all(yaml.as_bytes()).is_ok()
+        } else {
+            false
         }
     }
 
@@ -159,16 +149,32 @@ impl EditorFactory {
 }
 
 impl AssetEditorFactory for EditorFactory {
-    fn open(&self, asset: Uuid) -> Box<dyn AssetEditor> {
+    fn open(
+        &self,
+        filesystem: &FileSystem,
+        asset: Uuid,
+        source_url: &Url,
+        metadata_url: &Url,
+    ) -> Option<Box<dyn AssetEditor>> {
         let texture = self
             .asset_manager
             .load_sync(&Url::from_str(&format!("assets:///{}", asset)).unwrap())
             .unwrap();
 
-        Box::new(Editor {
-            uuid: asset,
-            texture,
-            import_parameters: ze_texture_asset::importer::Parameters::default(),
-        })
+        if let Ok(metadata_buf) = filesystem.read(metadata_url) {
+            if let Ok(metadata) = metadata_buf.try_into() {
+                Some(Box::new(Editor {
+                    uuid: asset,
+                    _source_url: source_url.clone(),
+                    metadata_url: metadata_url.clone(),
+                    texture,
+                    metadata,
+                }))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }

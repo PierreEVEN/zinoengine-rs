@@ -56,6 +56,7 @@ pub enum IterDirFlagBits {
 pub type IterDirFlags = BitFlags<IterDirFlagBits>;
 
 pub trait MountPoint: Send + Sync {
+    fn exists(&self, path: &Url) -> bool;
     fn read(&self, path: &Url) -> Result<Box<dyn Read>, Error>;
     fn write(&self, path: &Url) -> Result<Box<dyn Write>, Error>;
     fn iter_dir(
@@ -87,6 +88,15 @@ impl FileSystem {
             alias = mount_point.alias()
         );
         self.mount_points.write().push(mount_point);
+    }
+
+    pub fn exists(&self, path: &Url) -> bool {
+        if let Some(index) = self.matching_mount_point_for_url(path) {
+            let mount_point_guard = self.mount_points.read();
+            mount_point_guard[index].exists(path)
+        } else {
+            false
+        }
     }
 
     pub fn read(&self, path: &Url) -> Result<Box<dyn Read>, Error> {

@@ -12,7 +12,7 @@ use uuid::Uuid;
 use ze_asset_system::importer::BoxedAssetImporter;
 use ze_asset_system::{AssetLoadResult, AssetProvider, LoadError, ASSET_METADATA_EXTENSION};
 use ze_core::{ze_error, ze_info};
-use ze_filesystem::{FileSystem, IterDirFlagBits, IterDirFlags};
+use ze_filesystem::{DirEntryType, FileSystem, IterDirFlagBits, IterDirFlags};
 
 #[derive(Debug)]
 pub enum Error {
@@ -109,7 +109,9 @@ impl AssetServer {
                     path,
                     IterDirFlags::from_flag(IterDirFlagBits::Recursive),
                     |entry| {
-                        self.process_potential_source_asset(&entry.url);
+                        if entry.ty == DirEntryType::File {
+                            self.process_potential_source_asset(&entry.url);
+                        }
                     },
                 )
                 .unwrap_or_else(|_| ze_error!("Failed to scan asset directory {}", path));
@@ -151,85 +153,108 @@ impl AssetServer {
     }
 
     fn process_potential_source_asset(&self, url: &Url) {
-        let path = Path::new(url.path());
-        if let Some(extension) = path.extension() {
-            if let Some(importer) = self.importer_for_extension(&extension.to_string_lossy()) {
-                let key = url.as_str();
+        let key = url.as_str();
 
-                let current_file_hash = {
-                    let mut hasher = Sha256::new();
-                    let mut file = self.filesystem.read(url).unwrap();
-                    std::io::copy(&mut file, &mut hasher).unwrap();
-                    hasher.finalize()
-                };
-
-                // Ask the source DB more information about this file to check if we should import
-                // the asset
-                if let Ok(Some(entry)) = self.source_db.get(key) {
-                    let mut entry: SourceAssetDbEntry =
-                        bincode::serde::decode_from_slice(&entry, bincode::config::standard())
-                            .expect("source database maybe corrupted!")
-                            .0;
-
-                    if entry.source_hash_sha256.as_slice() != current_file_hash.as_slice() {
-                        entry.source_hash_sha256 = current_file_hash.to_vec();
-                        self.import_source_asset(url, entry, importer);
-                    }
-                } else {
-                    let entry = SourceAssetDbEntry {
-                        source_hash_sha256: current_file_hash.to_vec(),
-                    };
-                    self.import_source_asset(url, entry, importer);
-                }
-            }
-        }
-    }
-
-    fn import_source_asset(
-        &self,
-        url: &Url,
-        source_db_entry: SourceAssetDbEntry,
-        importer: Arc<dyn BoxedAssetImporter>,
-    ) {
-        ze_info!("Importing {}", url.to_string());
-
-        let metadata_url = {
-            let mut url = url.clone();
-            let asset_path =
-                url.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
-            let path = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
-            url.set_path(&path);
-            url
+        let current_file_hash = {
+            let mut hasher = Sha256::new();
+            let mut file = self.filesystem.read(url).unwrap();
+            std::io::copy(&mut file, &mut hasher).unwrap();
+            hasher.finalize()
         };
 
-        let mut file = self.filesystem.read(url).unwrap();
-        match importer.import(&self.filesystem, url, &mut file, &metadata_url) {
-            Ok(assets) => {
-                for asset in assets {
-                    self.asset_db
-                        .insert(asset.uuid(), asset.data().clone())
-                        .expect("Failed to store asset to asset database correctly!");
+        // Ask the source DB more information about this file to check if we should import
+        // the asset
+        if let Ok(Some(entry)) = self.source_db.get(key) {
+            let mut entry: SourceAssetDbEntry =
+                bincode::serde::decode_from_slice(&entry, bincode::config::standard())
+                    .expect("source database maybe corrupted!")
+                    .0;
 
-                    self.asset_db
+            let metadata_url = {
+                let mut url = url.clone();
+                let asset_path =
+                    url.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
+                let path = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
+                url.set_path(&path);
+                url
+            };
+
+            if entry.source_hash_sha256.as_slice() != current_file_hash.as_slice()
+                || !self.filesystem.exists(&metadata_url)
+            {
+                entry.source_hash_sha256 = current_file_hash.to_vec();
+                if self.import_source_asset(url) {
+                    self.source_db
                         .insert(
-                            format!("{}_type_uuid", asset.uuid().as_u128()),
-                            asset.type_uuid().as_bytes(),
+                            url.as_str(),
+                            bincode::serde::encode_to_vec(entry, bincode::config::standard())
+                                .expect("Cannot encode source asset database correctly!"),
                         )
-                        .expect("Failed to store asset to asset database correctly!");
+                        .expect("Failed to insert to source db");
                 }
+            }
+        } else {
+            let entry = SourceAssetDbEntry {
+                source_hash_sha256: current_file_hash.to_vec(),
+            };
 
+            if self.import_source_asset(url) {
                 self.source_db
                     .insert(
                         url.as_str(),
-                        bincode::serde::encode_to_vec(source_db_entry, bincode::config::standard())
+                        bincode::serde::encode_to_vec(entry, bincode::config::standard())
                             .expect("Cannot encode source asset database correctly!"),
                     )
                     .expect("Failed to insert to source db");
             }
-            Err(error) => {
-                ze_error!("Failed to import asset {}: {:?}", url, error);
+        }
+    }
+
+    pub fn import_source_asset(&self, url: &Url) -> bool {
+        let path = Path::new(url.path());
+        let extension = path.extension().unwrap().to_string_lossy();
+        if extension == ASSET_METADATA_EXTENSION {
+            return false;
+        }
+
+        if let Some(importer) = self.importer_for_extension(&extension) {
+            ze_info!("Importing {}", url.to_string());
+
+            let metadata_url = {
+                let mut url = url.clone();
+                let asset_path =
+                    url.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
+                let path = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
+                url.set_path(&path);
+                url
+            };
+
+            let mut file = self.filesystem.read(url).unwrap();
+            match importer.import(&self.filesystem, url, &mut file, &metadata_url) {
+                Ok(assets) => {
+                    for asset in assets {
+                        self.asset_db
+                            .insert(asset.uuid(), asset.data().clone())
+                            .expect("Failed to store asset to asset database correctly!");
+
+                        self.asset_db
+                            .insert(
+                                format!("{}_type_uuid", asset.uuid().as_u128()),
+                                asset.type_uuid().as_bytes(),
+                            )
+                            .expect("Failed to store asset to asset database correctly!");
+                    }
+                    true
+                }
+                Err(error) => {
+                    ze_error!("Failed to import asset {}: {:?}", url, error);
+                    false
+                }
             }
-        };
+        } else {
+            ze_error!("No importer for {}", url.to_string());
+            false
+        }
     }
 
     pub fn asset_type_uuid(&self, uuid: Uuid) -> Option<Uuid> {
@@ -266,7 +291,7 @@ impl AssetServer {
         None
     }
 
-    fn importer_for_extension(&self, extension: &str) -> Option<Arc<dyn BoxedAssetImporter>> {
+    pub fn importer_for_extension(&self, extension: &str) -> Option<Arc<dyn BoxedAssetImporter>> {
         let importers = self.importers.read();
         importers.get(extension).cloned()
     }

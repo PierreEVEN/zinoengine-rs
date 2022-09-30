@@ -1,5 +1,4 @@
-use enumflags2::bitflags;
-use enumflags2::BitFlags;
+use enumflags2::*;
 use std::ffi::{CString, NulError};
 use std::{mem, slice};
 use ze_freetype_sys::*;

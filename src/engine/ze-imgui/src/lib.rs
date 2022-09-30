@@ -9,11 +9,44 @@ use std::ptr::null_mut;
 use std::sync::Arc;
 use std::{mem, slice};
 use ze_core::maths::{Matrix4f32, RectI32, Vec2f32, Vec2i32};
+use ze_core::{ze_verbose};
 use ze_gfx::backend::*;
 use ze_gfx::{utils, PixelFormat, SampleDesc};
 use ze_imgui_sys::*;
-use ze_platform::{Cursor, Message, MouseButton, Platform, SystemCursor, Window};
+use ze_platform::{Cursor, KeyCode, Message, MouseButton, Platform, SystemCursor, Window};
 use ze_shader_system::ShaderManager;
+
+#[repr(transparent)]
+pub struct Viewport {
+    viewport: ImGuiViewport,
+}
+
+impl Viewport {
+    pub fn center(&self) -> ImVec2 {
+        let mut center = ImVec2::default();
+        unsafe {
+            let viewport = &self.viewport as *const _ as *mut _;
+            ImGuiViewport_GetCenter(&mut center, viewport);
+        }
+        center
+    }
+    
+    fn draw_data(&mut self) -> *mut ImDrawData {
+        self.viewport.DrawData
+    }
+
+    fn renderer_user_data(&mut self) -> *mut c_void {
+        self.viewport.RendererUserData
+    }
+}
+
+impl PartialEq<Self> for Viewport {
+    fn eq(&self, other: &Self) -> bool {
+        self.viewport.ID == other.viewport.ID
+    }
+}
+
+impl Eq for Viewport {}
 
 pub struct Context {
     device: Arc<dyn Device>,
@@ -45,7 +78,7 @@ impl Context {
         io.BackendFlags |= ImGuiBackendFlags__ImGuiBackendFlags_RendererHasVtxOffset as i32;
 
         unsafe {
-            let file = CString::new("assets/Roboto-Regular.ttf").unwrap();
+            let file = CString::new("assets/Inter-SemiBold.ttf").unwrap();
             ImFontAtlas_AddFontFromFileTTF(
                 io.Fonts,
                 file.as_ptr(),
@@ -274,7 +307,7 @@ impl Context {
             colors[ImGuiCol__ImGuiCol_NavWindowingDimBg as usize] =
                 ImVec4::new(0.80, 0.80, 0.80, 0.20);
             colors[ImGuiCol__ImGuiCol_ModalWindowDimBg as usize] =
-                ImVec4::new(0.80, 0.80, 0.80, 0.35);
+                ImVec4::new(0.80, 0.80, 0.80, 0.0);
         }
 
         context.update_monitors();
@@ -342,6 +375,12 @@ impl Context {
             }
             Message::MouseWheel(_, delta, _) => {
                 io.MouseWheel += delta;
+            },
+            Message::KeyDown(_, key, _, _) => {
+                unsafe { ImGuiIO_AddKeyEvent(igGetIO(), Key::from(*key) as ImGuiKey, true) };
+            },
+            Message::KeyUp(_, key, _, _) => {
+                unsafe { ImGuiIO_AddKeyEvent(igGetIO(), Key::from(*key) as ImGuiKey, false) };
             }
             _ => {}
         }
@@ -359,13 +398,11 @@ impl Context {
         let viewports =
             unsafe { slice::from_raw_parts(io.Viewports.Data, io.Viewports.Size as usize) };
 
-        let main_viewport = unsafe { igGetMainViewport() };
-
         for viewport in viewports {
-            let renderer_data =
-                unsafe { (*(*viewport)).RendererUserData as *mut ViewportRendererData };
+            let viewport = unsafe { (*viewport as *mut Viewport).as_mut().unwrap_unchecked() };
+            let renderer_data = viewport.renderer_user_data() as *mut ViewportRendererData;
 
-            if *viewport != main_viewport {
+            if viewport != self.main_viewport() {
                 if let SwapChainType::Owned((swapchain, views)) =
                     unsafe { &(*renderer_data).swapchain }
                 {
@@ -400,7 +437,7 @@ impl Context {
                     );
 
                     draw_viewport_internal(
-                        unsafe { (*viewport).as_mut() }.unwrap(),
+                        viewport,
                         &self.device,
                         &self.shader_manager,
                         &self.font_texture_view,
@@ -422,7 +459,7 @@ impl Context {
         }
     }
 
-    pub fn draw_viewport(&self, cmd_list: &mut CommandList, viewport: &mut ImGuiViewport) {
+    pub fn draw_viewport(&self, cmd_list: &mut CommandList, viewport: &mut Viewport) {
         draw_viewport_internal(
             viewport,
             &self.device,
@@ -492,9 +529,13 @@ impl Context {
         &mut self.str_buffer
     }
 
+    pub fn main_viewport(&self) -> &Viewport {
+        unsafe { (igGetMainViewport() as *mut Viewport).as_ref().unwrap_unchecked() }
+    }
+    
     #[allow(clippy::mut_from_ref)]
-    pub fn main_viewport(&self) -> &mut ImGuiViewport {
-        unsafe { igGetMainViewport().as_mut().unwrap_unchecked() }
+    pub fn main_viewport_mut(&self) -> &mut Viewport {
+        unsafe { (igGetMainViewport() as *mut Viewport).as_mut().unwrap_unchecked() }
     }
 }
 
@@ -630,6 +671,242 @@ pub enum StyleVar {
     SelectableTextAlign,
 }
 
+pub enum Cond {
+    None,
+    Always,
+    Once,
+    FirstUseEver,
+    Appearing
+}
+
+impl From<Cond> for ImGuiCond {
+    fn from(other: Cond) -> Self {
+        match other {
+            Cond::None => ImGuiCond__ImGuiCond_None,
+            Cond::Always => ImGuiCond__ImGuiCond_Always,
+            Cond::Once => ImGuiCond__ImGuiCond_Once,
+            Cond::FirstUseEver => ImGuiCond__ImGuiCond_FirstUseEver,
+            Cond::Appearing => ImGuiCond__ImGuiCond_Appearing,
+        }
+    }
+}
+
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+#[repr(i32)]
+pub enum Key {
+    None = 0,
+    Tab = 512,
+    LeftArrow = 513,
+    RightArrow = 514,
+    UpArrow = 515,
+    DownArrow = 516,
+    PageUp = 517,
+    PageDown = 518,
+    Home = 519,
+    End = 520,
+    Insert = 521,
+    Delete = 522,
+    Backspace = 523,
+    Space = 524,
+    Enter = 525,
+    Escape = 526,
+    LeftCtrl = 527,
+    LeftShift = 528,
+    LeftAlt = 529,
+    LeftSuper = 530,
+    RightCtrl = 531,
+    RightShift = 532,
+    RightAlt = 533,
+    RightSuper = 534,
+    Menu = 535,
+    Zero = 536,
+    One = 537,
+    Two = 538,
+    Three = 539,
+    Four = 540,
+    Five = 541,
+    Six = 542,
+    Seven = 543,
+    Eight = 544,
+    Nine = 545,
+    A = 546,
+    B = 547,
+    C = 548,
+    D = 549,
+    E = 550,
+    F = 551,
+    G = 552,
+    H = 553,
+    I = 554,
+    J = 555,
+    K = 556,
+    L = 557,
+    M = 558,
+    N = 559,
+    O = 560,
+    P = 561,
+    Q = 562,
+    R = 563,
+    S = 564,
+    T = 565,
+    U = 566,
+    V = 567,
+    W = 568,
+    X = 569,
+    Y = 570,
+    Z = 571,
+    F1 = 572,
+    F2 = 573,
+    F3 = 574,
+    F4 = 575,
+    F5 = 576,
+    F6 = 577,
+    F7 = 578,
+    F8 = 579,
+    F9 = 580,
+    F10 = 581,
+    F11 = 582,
+    F12 = 583,
+    Apostrophe = 584,
+    Comma = 585,
+    Minus = 586,
+    Period = 587,
+    Slash = 588,
+    Semicolon = 589,
+    Equal = 590,
+    LeftBracket = 591,
+    Backslash = 592,
+    RightBracket = 593,
+    GraveAccent = 594,
+    CapsLock = 595,
+    ScrollLock = 596,
+    NumLock = 597,
+    PrintScreen = 598,
+    Pause = 599,
+    Keypad0 = 600,
+    Keypad1 = 601,
+    Keypad2 = 602,
+    Keypad3 = 603,
+    Keypad4 = 604,
+    Keypad5 = 605,
+    Keypad6 = 606,
+    Keypad7 = 607,
+    Keypad8 = 608,
+    Keypad9 = 609,
+    KeypadDecimal = 610,
+    KeypadDivide = 611,
+    KeypadMultiply = 612,
+    KeypadSubtract = 613,
+    KeypadAdd = 614,
+    KeypadEnter = 615,
+    KeypadEqual = 616,
+    GamepadStart = 617,
+    GamepadBack = 618,
+    GamepadFaceUp = 619,
+    GamepadFaceDown = 620,
+    GamepadFaceLeft = 621,
+    GamepadFaceRight = 622,
+    GamepadDpadUp = 623,
+    GamepadDpadDown = 624,
+    GamepadDpadLeft = 625,
+    GamepadDpadRight = 626,
+    GamepadL1 = 627,
+    GamepadR1 = 628,
+    GamepadL2 = 629,
+    GamepadR2 = 630,
+    GamepadL3 = 631,
+    GamepadR3 = 632,
+    GamepadLStickUp = 633,
+    GamepadLStickDown = 634,
+    GamepadLStickLeft = 635,
+    GamepadLStickRight = 636,
+    GamepadRStickUp = 637,
+    GamepadRStickDown = 638,
+    GamepadRStickLeft = 639,
+    GamepadRStickRight = 640,
+    ModCtrl = 641,
+    ModShift = 642,
+    ModAlt = 643,
+    ModSuper = 644,
+}
+
+impl From<KeyCode> for Key {
+    fn from(key: KeyCode) -> Self {
+        match key {
+            KeyCode::None => Key::None,
+            KeyCode::Num0 => Key::Zero,
+            KeyCode::Num1 => Key::One,
+            KeyCode::Num2 => Key::Two,
+            KeyCode::Num3 => Key::Three,
+            KeyCode::Num4 => Key::Four,
+            KeyCode::Num5 => Key::Five,
+            KeyCode::Num6 => Key::Six,
+            KeyCode::Num7 => Key::Seven,
+            KeyCode::Num8 => Key::Eight,
+            KeyCode::Num9 => Key::Nine,
+            KeyCode::Numpad0 => Key::Keypad0,
+            KeyCode::Numpad1 => Key::Keypad1,
+            KeyCode::Numpad2 => Key::Keypad2,
+            KeyCode::Numpad3 => Key::Keypad3,
+            KeyCode::Numpad4 => Key::Keypad4,
+            KeyCode::Numpad5 => Key::Keypad5,
+            KeyCode::Numpad6 => Key::Keypad6,
+            KeyCode::Numpad7 => Key::Keypad7,
+            KeyCode::Numpad8 => Key::Keypad8,
+            KeyCode::Numpad9 => Key::Keypad9,
+            KeyCode::A => Key::A,
+            KeyCode::B => Key::B,
+            KeyCode::C => Key::C,
+            KeyCode::D => Key::D,
+            KeyCode::E => Key::E,
+            KeyCode::F => Key::F,
+            KeyCode::G => Key::G,
+            KeyCode::H => Key::H,
+            KeyCode::I => Key::I,
+            KeyCode::J => Key::J,
+            KeyCode::K => Key::K,
+            KeyCode::L => Key::L,
+            KeyCode::M => Key::M,
+            KeyCode::N => Key::N,
+            KeyCode::O => Key::O,
+            KeyCode::P => Key::P,
+            KeyCode::Q => Key::Q,
+            KeyCode::R => Key::R,
+            KeyCode::S => Key::S,
+            KeyCode::T => Key::T,
+            KeyCode::U => Key::U,
+            KeyCode::V => Key::V,
+            KeyCode::W => Key::W,
+            KeyCode::X => Key::X,
+            KeyCode::Y => Key::Y,
+            KeyCode::Z => Key::Z,
+            KeyCode::Escape => Key::Escape,
+            KeyCode::LeftControl => Key::LeftCtrl,
+            KeyCode::RightControl => Key::RightCtrl,
+            KeyCode::LeftAlt => Key::LeftAlt,
+            KeyCode::RightAlt => Key::RightAlt,
+            KeyCode::LeftShift => Key::LeftShift,
+            KeyCode::RightShift => Key::RightShift,
+            KeyCode::Space => Key::Space,
+            KeyCode::Backspace => Key::Backspace,
+            KeyCode::F1 => Key::F1,
+            KeyCode::F2 => Key::F2,
+            KeyCode::F3 => Key::F3,
+            KeyCode::F4 => Key::F4,
+            KeyCode::F5 => Key::F5,
+            KeyCode::F6 => Key::F6,
+            KeyCode::F7 => Key::F7,
+            KeyCode::F8 => Key::F8,
+            KeyCode::F9 => Key::F9,
+            KeyCode::F10 => Key::F10,
+            KeyCode::F11 => Key::F11,
+            KeyCode::F12 => Key::F12,
+            _ => { ze_verbose!("Key {:?} not handled", key); Key::None }
+        }
+    }
+}
+
 // UI elements
 impl Context {
     pub fn separator(&self) {
@@ -647,7 +924,20 @@ impl Context {
         let label = self.str_buffer.convert(label);
         unsafe { igCheckbox(label, checked) }
     }
+    
+    pub fn button(&mut self, label: &str, size: ImVec2) -> bool {
+        let label = self.str_buffer.convert(label);
+        unsafe { igButton(label, size) }
+    }
+    
+    pub fn set_scroll_x(&mut self, scroll: f32) {
+        unsafe { igSetScrollX_Float(scroll) }
+    }
 
+    pub fn set_scroll_y(&mut self, scroll: f32) {
+        unsafe { igSetScrollY_Float(scroll) }
+    }
+    
     pub fn text(&mut self, text: &str) {
         let c_text = self.str_buffer.convert(text);
         unsafe { igTextUnformatted(c_text, c_text.add(text.len())) };
@@ -732,6 +1022,12 @@ impl Context {
         }
     }
 
+    pub fn set_next_window_pos(&mut self, window_pos: ImVec2, cond: Cond, pivot: ImVec2) {
+        unsafe {
+            igSetNextWindowPos(window_pos, cond.into(), pivot);
+        }
+    }
+
     pub fn push_style_var_f32(&mut self, var: StyleVar, val: f32) {
         unsafe { igPushStyleVar_Float(var as i32, val) }
     }
@@ -746,7 +1042,7 @@ impl Context {
 
     pub fn begin_window(&mut self, name: &str, flags: WindowFlags) -> bool {
         let name = self.str_buffer.convert(name);
-        unsafe { igBegin(name, std::ptr::null_mut(), flags.bits() as i32) }
+        unsafe { igBegin(name, null_mut(), flags.bits() as i32) }
     }
 
     pub fn begin_window_closable(
@@ -762,11 +1058,42 @@ impl Context {
     pub fn end_window(&mut self) {
         unsafe { igEnd() };
     }
+    
+    pub fn begin_popup(&mut self, id: &str, flags: WindowFlags) -> bool {
+        unsafe {
+            let id = self.str_buffer.convert(id);
+            igBeginPopup(id, flags.bits() as i32)
+        }
+    }
 
-    pub fn dock_space_over_viewport(&self, viewport: &mut ImGuiViewport) -> ImGuiID {
+    pub fn begin_popup_modal(&mut self, id: &str, open: &mut bool, flags: WindowFlags) -> bool {
+        unsafe {
+            let id = self.str_buffer.convert(id);
+            igBeginPopupModal(id, open, flags.bits() as i32)
+        }
+    }
+    
+    pub fn end_popup(&mut self) {
+        unsafe { igEndPopup() }
+    }
+
+    pub fn open_popup(&mut self, id: &str) {
+        unsafe {
+            let id = self.str_buffer.convert(id);
+            igOpenPopup_Str(id, ImGuiPopupFlags__ImGuiPopupFlags_None as i32)
+        }
+    }
+
+    pub fn close_current_popup(&mut self) {
+        unsafe {
+            igCloseCurrentPopup()
+        }
+    }
+    
+    pub fn dock_space_over_viewport(&self, viewport: &Viewport) -> ImGuiID {
         unsafe {
             igDockSpaceOverViewport(
-                viewport,
+                viewport as *const _ as *mut ImGuiViewport,
                 ImGuiDockNodeFlags__ImGuiDockNodeFlags_None as i32,
                 std::ptr::null(),
             )
@@ -862,7 +1189,25 @@ impl Context {
             })
         }
     }
+    
+    pub fn is_key_pressed(&self, key: Key, repeat: bool) -> bool {
+        unsafe {
+            igIsKeyPressed(key as ImGuiKey, repeat)
+        }
+    }
 
+    pub fn is_key_released(&self, key: Key) -> bool {
+        unsafe {
+            igIsKeyReleased(key as ImGuiKey)
+        }
+    }
+
+    pub fn is_key_down(&self, key: Key) -> bool {
+        unsafe {
+            igIsKeyDown(key as ImGuiKey)
+        }
+    }
+    
     pub fn begin_main_menu_bar(&self) -> bool {
         unsafe { igBeginMainMenuBar() }
     }
@@ -1023,7 +1368,7 @@ impl ViewportPlatformData {
 }
 
 fn draw_viewport_internal(
-    viewport: &mut ImGuiViewport,
+    viewport: &mut Viewport,
     device: &Arc<dyn Device>,
     shader_manager: &Arc<ShaderManager>,
     font_texture: &ShaderResourceView,
@@ -1040,9 +1385,9 @@ fn draw_viewport_internal(
     }
 
     let renderer_data =
-        unsafe { (viewport.RendererUserData as *mut ViewportRendererData).as_mut() }.unwrap();
+        unsafe { (viewport.renderer_user_data() as *mut ViewportRendererData).as_mut() }.unwrap();
 
-    let draw_data = unsafe { viewport.DrawData.as_ref().unwrap_unchecked() };
+    let draw_data = unsafe { viewport.draw_data().as_ref().unwrap_unchecked() };
     renderer_data.update_buffers(device, draw_data);
 
     if let Ok(shader) = shader_manager.shader_modules(&"ImGui".to_string(), None) {
@@ -1094,7 +1439,7 @@ fn draw_viewport_internal(
 
             device.cmd_set_viewports(
                 cmd_list,
-                &[Viewport {
+                &[ze_gfx::backend::Viewport {
                     position: Vec2f32::default(),
                     size: Vec2f32::new(draw_data.DisplaySize.x, draw_data.DisplaySize.y),
                     min_depth: 0.0,

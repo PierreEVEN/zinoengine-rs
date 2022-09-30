@@ -116,6 +116,11 @@ impl StdMountPoint {
 }
 
 impl MountPoint for StdMountPoint {
+    fn exists(&self, path: &Url) -> bool {
+        let path = self.to_fs_path(path);
+        path.exists()
+    }
+
     fn read(&self, path: &Url) -> Result<Box<dyn Read>, Error> {
         let file = File::open(self.to_fs_path(path))?;
         Ok(Box::new(file))

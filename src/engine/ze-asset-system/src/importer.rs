@@ -1,4 +1,5 @@
-﻿use serde_derive::{Deserialize, Serialize};
+﻿use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::io;
 use std::io::{Read, Write};
 use std::sync::Arc;
@@ -123,14 +124,14 @@ where
 
 /// Store metadata about a source asset
 /// Will typically store the main asset UUID and may also store state (e.g other UUIDs) and import parameters
-#[derive(Serialize, Deserialize)]
+#[derive(serde_derive::Serialize, serde_derive::Deserialize)]
 pub struct SourceAssetMetadata<S, P> {
     uuid: Uuid,
     importer_state: S,
     importer_parameters: P,
 }
 
-impl<S, P> SourceAssetMetadata<S, P> {
+impl<S: Serialize + DeserializeOwned, P: Serialize + DeserializeOwned> SourceAssetMetadata<S, P> {
     pub fn new(uuid: Uuid, importer_state: S, importer_parameters: P) -> Self {
         Self {
             uuid,
@@ -141,5 +142,24 @@ impl<S, P> SourceAssetMetadata<S, P> {
 
     pub fn uuid(&self) -> &Uuid {
         &self.uuid
+    }
+
+    pub fn parameters(&self) -> &P {
+        &self.importer_parameters
+    }
+
+    pub fn parameters_mut(&mut self) -> &mut P {
+        &mut self.importer_parameters
+    }
+}
+
+impl<S: Serialize + DeserializeOwned, P: Serialize + DeserializeOwned> TryFrom<Box<dyn Read>>
+    for SourceAssetMetadata<S, P>
+{
+    type Error = serde_yaml::Error;
+
+    fn try_from(file: Box<dyn Read>) -> Result<Self, Self::Error> {
+        let metadata: Self = serde_yaml::from_reader(file)?;
+        Ok(metadata)
     }
 }

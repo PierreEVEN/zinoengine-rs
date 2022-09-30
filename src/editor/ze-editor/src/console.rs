@@ -37,6 +37,8 @@ impl Console {
             imgui.text_wrapped(&message);
         }
 
+        imgui.set_scroll_y(99999.0);
+
         imgui.end_child();
         imgui.end_window();
     }

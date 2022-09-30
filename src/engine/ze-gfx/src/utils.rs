@@ -91,7 +91,7 @@ pub fn copy_data_to_texture(
     let subresource_layout = device.texture_subresource_layout(texture, 0);
     let staging = device.create_buffer(
         &BufferDesc {
-            size_bytes: data.len() as u64,
+            size_bytes: subresource_layout.size_in_bytes,
             usage: BufferUsageFlags::default(),
             memory_location: MemoryLocation::CpuToGpu,
             default_resource_state: ResourceState::CopyRead,

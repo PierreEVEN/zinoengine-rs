@@ -18,11 +18,13 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use ze_core::maths::{RectI32, Vec2i32};
+use ze_core::ze_verbose;
 use ze_platform::{
-    Cursor, Error, Message, Monitor, MouseButton, Platform, SystemCursor, Window, WindowFlagBits,
-    WindowFlags,
+    Cursor, Error, KeyCode, Message, Monitor, MouseButton, Platform, SystemCursor, Window,
+    WindowFlagBits, WindowFlags,
 };
 
 macro_rules! ze_win_loword {
@@ -230,8 +232,119 @@ impl WindowsPlatform {
                         self.mouse_position(),
                     ));
                 }
+                WM_SYSKEYDOWN | WM_KEYDOWN => {
+                    let key_code = VIRTUAL_KEY(wparam.0 as u16);
+                    let repeat = (lparam.0 & 0x40000000) != 0;
+                    let character_code =
+                        unsafe { MapVirtualKeyW(key_code.0 as u32, MAPVK_VK_TO_CHAR) };
+                    message_queue.push_back(Message::KeyDown(
+                        window.clone(),
+                        convert_key_code(key_code),
+                        character_code,
+                        repeat,
+                    ));
+                }
+                WM_SYSKEYUP | WM_KEYUP => {
+                    let key_code = VIRTUAL_KEY(wparam.0 as u16);
+                    let repeat = (lparam.0 & 0x40000000) != 0;
+                    let character_code =
+                        unsafe { MapVirtualKeyW(key_code.0 as u32, MAPVK_VK_TO_CHAR) };
+                    message_queue.push_back(Message::KeyUp(
+                        window.clone(),
+                        convert_key_code(key_code),
+                        character_code,
+                        repeat,
+                    ));
+                }
                 _ => (),
             }
+        }
+    }
+}
+
+fn convert_key_code(key: VIRTUAL_KEY) -> KeyCode {
+    match key {
+        VK_ESCAPE => KeyCode::Escape,
+        VK_SPACE => KeyCode::Space,
+        VK_A => KeyCode::A,
+        VK_B => KeyCode::B,
+        VK_C => KeyCode::C,
+        VK_D => KeyCode::D,
+        VK_E => KeyCode::E,
+        VK_F => KeyCode::F,
+        VK_G => KeyCode::G,
+        VK_H => KeyCode::H,
+        VK_I => KeyCode::I,
+        VK_J => KeyCode::J,
+        VK_K => KeyCode::K,
+        VK_L => KeyCode::L,
+        VK_M => KeyCode::M,
+        VK_N => KeyCode::N,
+        VK_O => KeyCode::O,
+        VK_P => KeyCode::P,
+        VK_Q => KeyCode::Q,
+        VK_R => KeyCode::R,
+        VK_S => KeyCode::S,
+        VK_T => KeyCode::T,
+        VK_U => KeyCode::U,
+        VK_V => KeyCode::V,
+        VK_W => KeyCode::W,
+        VK_X => KeyCode::X,
+        VK_Y => KeyCode::Y,
+        VK_Z => KeyCode::Z,
+        VK_NUMPAD0 => KeyCode::Numpad0,
+        VK_NUMPAD1 => KeyCode::Numpad1,
+        VK_NUMPAD2 => KeyCode::Numpad2,
+        VK_NUMPAD3 => KeyCode::Numpad3,
+        VK_NUMPAD4 => KeyCode::Numpad4,
+        VK_NUMPAD5 => KeyCode::Numpad5,
+        VK_NUMPAD6 => KeyCode::Numpad6,
+        VK_NUMPAD7 => KeyCode::Numpad7,
+        VK_NUMPAD8 => KeyCode::Numpad8,
+        VK_NUMPAD9 => KeyCode::Numpad9,
+        VK_0 => KeyCode::Num0,
+        VK_1 => KeyCode::Num1,
+        VK_2 => KeyCode::Num2,
+        VK_3 => KeyCode::Num3,
+        VK_4 => KeyCode::Num4,
+        VK_5 => KeyCode::Num5,
+        VK_6 => KeyCode::Num6,
+        VK_7 => KeyCode::Num7,
+        VK_8 => KeyCode::Num8,
+        VK_9 => KeyCode::Num9,
+        VK_CONTROL => KeyCode::LeftControl,
+        VK_LSHIFT => KeyCode::LeftShift,
+        VK_MENU => KeyCode::LeftAlt,
+        VK_RCONTROL => KeyCode::RightControl,
+        VK_RSHIFT => KeyCode::RightShift,
+        VK_LMENU => KeyCode::RightAlt,
+        VK_F1 => KeyCode::F1,
+        VK_F2 => KeyCode::F2,
+        VK_F3 => KeyCode::F3,
+        VK_F4 => KeyCode::F4,
+        VK_F5 => KeyCode::F5,
+        VK_F6 => KeyCode::F6,
+        VK_F7 => KeyCode::F7,
+        VK_F8 => KeyCode::F8,
+        VK_F9 => KeyCode::F9,
+        VK_F10 => KeyCode::F10,
+        VK_F11 => KeyCode::F11,
+        VK_F12 => KeyCode::F12,
+        VK_F13 => KeyCode::F13,
+        VK_F14 => KeyCode::F14,
+        VK_F15 => KeyCode::F15,
+        VK_F16 => KeyCode::F16,
+        VK_F17 => KeyCode::F17,
+        VK_F18 => KeyCode::F18,
+        VK_F19 => KeyCode::F19,
+        VK_F20 => KeyCode::F20,
+        VK_F21 => KeyCode::F21,
+        VK_F22 => KeyCode::F22,
+        VK_F23 => KeyCode::F23,
+        VK_F24 => KeyCode::F24,
+        _ => {
+            ze_verbose!("Key {} not handled", key.0);
+            KeyCode::None
         }
     }
 }

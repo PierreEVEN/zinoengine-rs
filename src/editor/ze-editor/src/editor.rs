@@ -177,7 +177,10 @@ impl EditorApplication {
             TextureLoader::new(self.device.clone()),
         );
 
-        let asset_editor_manager = Arc::new(ze_asset_editor::AssetEditorManager::default());
+        let asset_editor_manager = Arc::new(ze_asset_editor::AssetEditorManager::new(
+            self.filesystem.clone(),
+            asset_server.clone(),
+        ));
         asset_editor_manager.add_editor_factory(
             ze_texture_asset::Texture::type_uuid(),
             ze_texture_editor::EditorFactory::new(asset_manager.clone()),
@@ -275,7 +278,7 @@ impl EditorApplication {
                 },
                 |_, cmd_list| {
                     self.imgui
-                        .draw_viewport(cmd_list, self.imgui.main_viewport());
+                        .draw_viewport(cmd_list, self.imgui.main_viewport_mut());
                     /*viewport_renderer.draw(
                         delta_time,
                         &mut ui_state,
@@ -296,7 +299,7 @@ impl EditorApplication {
             self.device
                 .submit(QueueType::Graphics, &[&main_cmd_list], &[], &[]);
             self.device.present(swapchain);
-            //self.imgui.present();
+            self.imgui.present();
 
             self.device.end_frame();
         }
@@ -328,7 +331,7 @@ impl EditorApplication {
                 )
                 .expect("Failed to create editor main window swapchain"),
         );
-
+        let mut i = 20;
         for i in 0..self.device.swapchain_backbuffer_count(&swapchain) {
             self.main_window_swapchain_rtvs.push(Arc::new(
                 self.device

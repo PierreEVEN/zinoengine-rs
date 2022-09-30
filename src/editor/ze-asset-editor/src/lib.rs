@@ -1,61 +1,182 @@
+use enumflags2::*;
 use parking_lot::Mutex;
 use std::collections::HashMap;
+use std::sync::Arc;
+use url::Url;
+use ze_asset_server::AssetServer;
+use ze_asset_system::ASSET_METADATA_EXTENSION;
 use ze_core::type_uuid::Uuid;
-use ze_imgui::ze_imgui_sys::ImGuiID;
-use ze_imgui::{WindowFlagBits, WindowFlags};
+use ze_core::ze_info;
+use ze_filesystem::FileSystem;
+use ze_imgui::ze_imgui_sys::{ImGuiID, ImVec2};
+use ze_imgui::{Cond, Context, Key, WindowFlagBits, WindowFlags};
 
 pub trait AssetEditor {
-    fn draw(&mut self, imgui: &mut ze_imgui::Context);
+    fn draw(&mut self, imgui: &mut Context, context: &mut AssetEditorDrawContext);
+    fn save(&self, filesystem: &FileSystem) -> bool;
     fn asset_uuid(&self) -> Uuid;
 }
 
 pub trait AssetEditorFactory {
-    fn open(&self, asset: Uuid) -> Box<dyn AssetEditor>;
+    fn open(
+        &self,
+        filesystem: &FileSystem,
+        asset: Uuid,
+        source_url: &Url,
+        metadata_url: &Url,
+    ) -> Option<Box<dyn AssetEditor>>;
+}
+
+struct AssetEditorEntry {
+    editor: Box<dyn AssetEditor>,
+    source_url: Url,
+    unsaved: bool,
+    closing: bool,
+}
+
+impl AssetEditorEntry {
+    pub fn new(editor: Box<dyn AssetEditor>, source_url: Url) -> Self {
+        Self {
+            editor,
+            source_url,
+            unsaved: false,
+            closing: false,
+        }
+    }
+}
+
+pub struct AssetEditorManager {
+    filesystem: Arc<FileSystem>,
+    asset_server: Arc<AssetServer>,
+    editor_factories: Mutex<HashMap<Uuid, Box<dyn AssetEditorFactory>>>,
+    editors: Mutex<Vec<AssetEditorEntry>>,
 }
 
 #[derive(Default)]
-pub struct AssetEditorManager {
-    editor_factories: Mutex<HashMap<Uuid, Box<dyn AssetEditorFactory>>>,
-    editors: Mutex<Vec<Box<dyn AssetEditor>>>,
+pub struct AssetEditorDrawContext {
+    need_save: bool,
+}
+
+impl AssetEditorDrawContext {
+    pub fn mark_as_unsaved(&mut self) {
+        self.need_save = true;
+    }
 }
 
 impl AssetEditorManager {
+    pub fn new(filesystem: Arc<FileSystem>, asset_server: Arc<AssetServer>) -> Self {
+        Self {
+            filesystem,
+            asset_server,
+            editor_factories: Default::default(),
+            editors: Default::default(),
+        }
+    }
+
     pub fn add_editor_factory<F: AssetEditorFactory + 'static>(&self, type_uuid: Uuid, editor: F) {
         let mut editors = self.editor_factories.lock();
         editors.insert(type_uuid, Box::new(editor));
     }
 
-    pub fn open_asset(&self, type_uuid: Uuid, uuid: Uuid) {
+    pub fn open_asset(&self, type_uuid: Uuid, uuid: Uuid, source_url: &Url) {
         let mut editors = self.editors.lock();
-        for editor in editors.iter() {
-            if editor.asset_uuid() == uuid {
+        for entry in editors.iter() {
+            if entry.editor.asset_uuid() == uuid {
                 return;
             }
         }
 
         let factories = self.editor_factories.lock();
-        if let Some(editor) = factories.get(&type_uuid) {
-            editors.push(editor.open(uuid));
+        if let Some(factory) = factories.get(&type_uuid) {
+            let metadata_url = {
+                let mut url = source_url.clone();
+                let asset_path =
+                    url.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
+                let path = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
+                url.set_path(&path);
+                url
+            };
+
+            // TODO: Manage errors
+            if let Some(editor) = factory.open(&self.filesystem, uuid, source_url, &metadata_url) {
+                editors.push(AssetEditorEntry::new(editor, source_url.clone()));
+            }
         }
     }
 
-    pub fn draw_editors(&self, imgui: &mut ze_imgui::Context, main_dockspace_id: ImGuiID) {
+    pub fn draw_editors(&self, imgui: &mut Context, main_dockspace_id: ImGuiID) {
         let mut editors = self.editors.lock();
         let mut editors_to_remove = vec![];
-        for (i, editor) in editors.iter_mut().enumerate() {
+        for (i, entry) in editors.iter_mut().enumerate() {
             imgui.next_window_dock_id(main_dockspace_id);
             let mut is_open = true;
+            let mut flags = WindowFlags::from_flag(WindowFlagBits::NoSavedSettings);
+            if entry.unsaved {
+                flags.insert(WindowFlagBits::UnsavedDocument);
+            }
+
             if imgui.begin_window_closable(
-                &editor.asset_uuid().to_string(),
+                &entry.editor.asset_uuid().to_string(),
                 &mut is_open,
-                WindowFlags::from_flag(WindowFlagBits::NoSavedSettings),
-            ) && is_open
-            {
-                editor.draw(imgui);
+                flags,
+            ) {
+                let mut context = AssetEditorDrawContext::default();
+                entry.editor.draw(imgui, &mut context);
+
+                if imgui.is_key_down(Key::LeftCtrl) && imgui.is_key_pressed(Key::S, false) {
+                    ze_info!("Saving {}", entry.source_url);
+                    if entry.editor.save(&self.filesystem) {
+                        ze_info!("Saved {}", entry.source_url);
+                        entry.unsaved = false;
+                        self.asset_server.import_source_asset(&entry.source_url);
+                    }
+                } else if context.need_save {
+                    entry.unsaved = true;
+                }
+            }
+
+            imgui.set_next_window_pos(
+                imgui.main_viewport().center(),
+                Cond::Appearing,
+                ImVec2::new(0.5, 0.5),
+            );
+            if imgui.begin_popup_modal(
+                "##Close",
+                &mut entry.closing,
+                make_bitflags! { WindowFlagBits::{AlwaysAutoResize} },
+            ) {
+                imgui.dummy(ImVec2::new(1.0, 15.0));
+                imgui
+                    .text_centered_wrapped("Asset not saved, are you sure you want to close?", 100);
+                imgui.dummy(ImVec2::new(1.0, 25.0));
+                if imgui.button("Save", ImVec2::new(120.0, 0.0))
+                    && entry.editor.save(&self.filesystem)
+                {
+                    imgui.close_current_popup();
+                    self.asset_server.import_source_asset(&entry.source_url);
+                    editors_to_remove.push(i);
+                }
+
+                imgui.same_line(0.0, -1.0);
+                if imgui.button("Don't save", ImVec2::new(120.0, 0.0)) {
+                    imgui.close_current_popup();
+                    editors_to_remove.push(i);
+                }
+                imgui.same_line(0.0, -1.0);
+                if imgui.button("Cancel", ImVec2::new(120.0, 0.0)) {
+                    imgui.close_current_popup();
+                }
+                imgui.dummy(ImVec2::new(1.0, 15.0));
+                imgui.end_popup();
             }
 
             if !is_open {
-                editors_to_remove.push(i);
+                if entry.unsaved {
+                    entry.closing = true;
+                    imgui.open_popup("##Close");
+                } else {
+                    editors_to_remove.push(i);
+                }
             }
 
             imgui.end_window();
