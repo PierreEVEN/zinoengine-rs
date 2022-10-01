@@ -196,6 +196,9 @@ impl EditorApplication {
         let console = Console::new();
 
         while running {
+            puffin::GlobalProfiler::lock().new_frame();
+            puffin::profile_scope!("Main loop");
+
             let delta_time = previous.elapsed().as_secs_f32();
             previous = Instant::now();
 
@@ -238,9 +241,12 @@ impl EditorApplication {
                 self.imgui.end_main_menu_bar();
             }
 
-            asset_explorer.draw(&mut self.imgui);
-            asset_editor_manager.draw_editors(&mut self.imgui, main_dockspace_id);
-            console.draw(&mut self.imgui);
+            {
+                puffin::profile_scope!("Draw editor");
+                asset_explorer.draw(&mut self.imgui);
+                asset_editor_manager.draw_editors(&mut self.imgui, main_dockspace_id);
+                console.draw(&mut self.imgui);
+            }
 
             self.imgui.end_frame();
             // Render
@@ -279,27 +285,31 @@ impl EditorApplication {
                 |_, cmd_list| {
                     self.imgui
                         .draw_viewport(cmd_list, self.imgui.main_viewport_mut());
-                    /*viewport_renderer.draw(
-                        delta_time,
-                        &mut ui_state,
-                        cmd_list,
-                        &mut glyph_cache,
-                        &mut font_cache,
-                        Vec2f32::new(swapchain.info.width as f32, swapchain.info.height as f32),
-
-                    );
-                    */
                 },
             );
 
-            render_graph.compile("backbuffer");
-            render_graph.execute(&mut main_cmd_list);
+            {
+                puffin::profile_scope!("Render Graph compilation");
+                render_graph.compile("backbuffer");
+            }
+
+            {
+                puffin::profile_scope!("Render Graph execution");
+                render_graph.execute(&mut main_cmd_list);
+            }
 
             self.imgui.draw_non_main_viewports(&mut main_cmd_list);
-            self.device
-                .submit(QueueType::Graphics, &[&main_cmd_list], &[], &[]);
-            self.device.present(swapchain);
-            self.imgui.present();
+            {
+                puffin::profile_scope!("Submit");
+                self.device
+                    .submit(QueueType::Graphics, &[&main_cmd_list], &[], &[]);
+            }
+
+            {
+                puffin::profile_scope!("Present");
+                self.device.present(swapchain);
+                self.imgui.present();
+            }
 
             self.device.end_frame();
         }
@@ -331,7 +341,6 @@ impl EditorApplication {
                 )
                 .expect("Failed to create editor main window swapchain"),
         );
-        let mut i = 20;
         for i in 0..self.device.swapchain_backbuffer_count(&swapchain) {
             self.main_window_swapchain_rtvs.push(Arc::new(
                 self.device

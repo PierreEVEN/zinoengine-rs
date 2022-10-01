@@ -63,7 +63,7 @@ pub trait MountPoint: Send + Sync {
         &self,
         path: &Url,
         flags: IterDirFlags,
-        f: &mut dyn FnMut(DirEntry),
+        f: &mut dyn FnMut(&DirEntry),
     ) -> Result<(), Error>;
     fn watch(
         &self,
@@ -145,7 +145,7 @@ impl FileSystem {
         &self,
         path: &Url,
         flags: IterDirFlags,
-        mut f: impl FnMut(DirEntry),
+        mut f: impl FnMut(&DirEntry),
     ) -> Result<(), Error> {
         if let Some(index) = self.matching_mount_point_for_url(path) {
             let mount_point_guard = self.mount_points.read();
@@ -218,9 +218,11 @@ impl FileSystem {
 }
 
 pub fn make_url_for_zefs(mount_point: &str, path: &str) -> Result<Url, ParseError> {
-    let url = format!("vfs://{}{}", mount_point, path);
+    let url = format!("{VFS_PROTOCOL}{mount_point}{path}");
     Url::from_str(&url)
 }
+
+const VFS_PROTOCOL: &str = "vfs://";
 
 pub mod mount_points;
 pub extern crate percent_encoding;

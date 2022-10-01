@@ -40,6 +40,7 @@ impl AssetExplorer {
     }
 
     pub fn draw(&mut self, imgui: &mut Context) {
+        puffin::profile_function!();
         imgui.begin_window(
             ASSET_EXPLORER_ID,
             make_bitflags! { WindowFlagBits::{NoScrollbar | NoScrollWithMouse}},
@@ -71,6 +72,7 @@ impl AssetExplorer {
     }
 
     fn draw_directory_list(&mut self, imgui: &mut Context) {
+        puffin::profile_function!();
         imgui.begin_child(
             "Directory List",
             imgui.available_content_region(),
@@ -111,7 +113,7 @@ impl AssetExplorer {
                         return;
                     }
                 }
-                entries.push(entry);
+                entries.push(entry.clone());
             })
             .unwrap();
 
@@ -162,6 +164,14 @@ impl AssetExplorer {
                     }
                 }
 
+                if entry.ty == DirEntryType::File {
+                    imgui.push_style_var_vec2f32(StyleVar::WindowPadding, ImVec2::new(5.0, 5.0));
+                    imgui.begin_tooltip();
+                    imgui.pop_style_var(1);
+                    imgui.text(entry.url.path());
+                    imgui.end_tooltip();
+                }
+
                 let cursor_screen_pos = imgui.cursor_screen_pos();
                 imgui.window_add_rect_filled(
                     cursor_screen_pos,
@@ -191,17 +201,22 @@ impl AssetExplorer {
     }
 
     fn draw_directory_hierarchy(&mut self, imgui: &mut Context) {
+        // TODO: Cache hierarchy
+
+        puffin::profile_function!();
         imgui.begin_child(
             "Directory Hierarchy",
             imgui.available_content_region(),
             false,
             WindowFlags::empty(),
         );
-        self.draw_hierarchy_recursive(imgui, &Url::from_str("vfs://main/assets").unwrap());
+        self.draw_directory_entry(imgui, &Url::from_str("vfs://main/assets").unwrap());
         imgui.end_child();
     }
 
-    fn draw_hierarchy_recursive(&mut self, imgui: &mut Context, url: &Url) {
+    fn draw_directory_entry(&mut self, imgui: &mut Context, url: &Url) {
+        puffin::profile_function!(url.path());
+
         let mut flags = make_bitflags! { TreeNodeFlagBits::{DefaultOpen | OpenOnArrow | OpenOnDoubleClick | SpanFullWidth } };
         if self.current_directory == *url {
             flags.insert(TreeNodeFlagBits::Selected);
@@ -226,7 +241,7 @@ impl AssetExplorer {
             filesystem
                 .iter_dir(url, IterDirFlags::empty(), |entry| {
                     if entry.ty == DirEntryType::Directory {
-                        self.draw_hierarchy_recursive(imgui, &entry.url);
+                        self.draw_directory_entry(imgui, &entry.url);
                     }
                 })
                 .unwrap();

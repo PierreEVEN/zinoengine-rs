@@ -1,7 +1,7 @@
 ﻿use crate::descriptor_manager::DescriptorManager;
 use crate::frame_manager::FrameManager;
 use crate::pipeline_manager::PipelineManager;
-use crate::pix;
+#[cfg(feature = "pix")]
 use crate::pix::{pix_begin_event_cmd_list, pix_end_event_cmd_list};
 use crate::utils::*;
 use gpu_allocator::d3d12::{Allocation, AllocationCreateDesc, Allocator, AllocatorCreateDesc};
@@ -22,7 +22,7 @@ use windows::Win32::Graphics::Dxgi::Common::{
     DXGI_FORMAT_UNKNOWN, DXGI_SAMPLE_DESC,
 };
 use windows::Win32::Graphics::Dxgi::*;
-use ze_core::color::{Color4f32, Color4u8};
+use ze_core::color::Color4f32;
 use ze_core::downcast_rs::Downcast;
 use ze_core::maths::RectI32;
 use ze_gfx::backend::*;
@@ -919,7 +919,10 @@ impl Device for D3D12Device {
         }
     }
 
+    #[cfg(feature = "pix")]
     fn cmd_debug_begin_event(&self, cmd_list: &mut CommandList, name: &str, color: Color4f32) {
+        use ze_core::color::Color4u8;
+
         let cmd_list = unsafe {
             cmd_list
                 .backend_data
@@ -940,6 +943,10 @@ impl Device for D3D12Device {
         }
     }
 
+    #[cfg(not(feature = "pix"))]
+    fn cmd_debug_begin_event(&self, _: &mut CommandList, _: &str, _: Color4f32) {}
+
+    #[cfg(feature = "pix")]
     fn cmd_debug_end_event(&self, cmd_list: &mut CommandList) {
         let cmd_list = unsafe {
             cmd_list
@@ -957,6 +964,9 @@ impl Device for D3D12Device {
             pix_end_event_cmd_list(cmd_list);
         }
     }
+
+    #[cfg(not(feature = "pix"))]
+    fn cmd_debug_end_event(&self, _: &mut CommandList) {}
 
     fn cmd_begin_render_pass(&self, cmd_list: &mut CommandList, desc: &RenderPassDesc) {
         let mut cmd_list = unsafe {

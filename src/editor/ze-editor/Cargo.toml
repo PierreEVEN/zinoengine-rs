@@ -28,6 +28,9 @@ enumflags2 = "0.7.5"
 parking_lot = "0.12.1"
 image = "0.24.2"
 cfg-if = "1.0.0"
+puffin = "0.13.3"
+puffin_http = "0.10.0"
+mimalloc = { version = "*", default-features = false }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 ze-windows-platform = { version = "0.1.0", path = "../../engine/windows/ze-windows-platform" }

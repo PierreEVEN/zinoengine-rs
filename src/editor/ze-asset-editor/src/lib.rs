@@ -32,6 +32,7 @@ struct AssetEditorEntry {
     source_url: Url,
     unsaved: bool,
     closing: bool,
+    closed: bool,
 }
 
 impl AssetEditorEntry {
@@ -41,6 +42,7 @@ impl AssetEditorEntry {
             source_url,
             unsaved: false,
             closing: false,
+            closed: false,
         }
     }
 }
@@ -106,8 +108,9 @@ impl AssetEditorManager {
 
     pub fn draw_editors(&self, imgui: &mut Context, main_dockspace_id: ImGuiID) {
         let mut editors = self.editors.lock();
-        let mut editors_to_remove = vec![];
-        for (i, entry) in editors.iter_mut().enumerate() {
+        editors.retain(|entry| !entry.closed);
+
+        for entry in editors.iter_mut() {
             imgui.next_window_dock_id(main_dockspace_id);
             let mut is_open = true;
             let mut flags = WindowFlags::from_flag(WindowFlagBits::NoSavedSettings);
@@ -154,13 +157,13 @@ impl AssetEditorManager {
                 {
                     imgui.close_current_popup();
                     self.asset_server.import_source_asset(&entry.source_url);
-                    editors_to_remove.push(i);
+                    entry.closed = true;
                 }
 
                 imgui.same_line(0.0, -1.0);
                 if imgui.button("Don't save", ImVec2::new(120.0, 0.0)) {
                     imgui.close_current_popup();
-                    editors_to_remove.push(i);
+                    entry.closed = true;
                 }
                 imgui.same_line(0.0, -1.0);
                 if imgui.button("Cancel", ImVec2::new(120.0, 0.0)) {
@@ -175,15 +178,11 @@ impl AssetEditorManager {
                     entry.closing = true;
                     imgui.open_popup("##Close");
                 } else {
-                    editors_to_remove.push(i);
+                    entry.closed = true;
                 }
             }
 
             imgui.end_window();
-        }
-
-        for i in editors_to_remove {
-            editors.remove(i);
         }
     }
 }

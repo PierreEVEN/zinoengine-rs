@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::fs::{read_dir, File};
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::thread;
@@ -69,8 +68,8 @@ impl StdMountPoint {
                                 DebouncedEvent::Write(path) => {
                                     let watcher_closure_map = watcher_closure_map.lock();
                                     if let Some(f) = watcher_closure_map.get(&path) {
-                                        let path = StdMountPoint::fs_path_to_zefs_path(
-                                            &root,
+                                        let path = Self::fs_path_to_zefs_path(
+                                            root.as_ref(),
                                             &path.canonicalize().unwrap(),
                                         );
                                         f(WatchEvent::Write(
@@ -94,24 +93,28 @@ impl StdMountPoint {
         })
     }
 
-    fn fs_path_to_zefs_path(root: &str, path: &Path) -> String {
-        let mut path = path.to_string_lossy().to_string().replace('\\', "/");
-        path.replace_range(0..root.len(), "");
+    fn fs_path_to_zefs_path(root: &Path, path: &Path) -> String {
+        let mut path = path.to_string_lossy().to_string();
+        path.replace_range(0..root.as_os_str().len(), "");
+
+        #[cfg(windows)]
+        let path = path.replace('\\', "/");
+
         path
     }
 
     fn to_fs_path(&self, path: &Url) -> PathBuf {
-        let path = percent_decode_str(path.path())
-            .decode_utf8_lossy()
-            .to_string();
+        let path = percent_decode_str(path.path()).decode_utf8_lossy()[1..].to_string();
 
         // Because we use long paths we can't pass to std::fs functions any forward slashes
         // Only for Windows
         #[cfg(windows)]
         let path = path.replace('/', "\\");
 
-        let path = format!("{}{}", self.root.to_string_lossy(), path);
-        PathBuf::from_str(&path).unwrap()
+        let mut path_buf = PathBuf::with_capacity(self.root.as_os_str().len() + path.len());
+        path_buf.push(self.root.as_path());
+        path_buf.push(path);
+        path_buf
     }
 }
 
@@ -135,18 +138,14 @@ impl MountPoint for StdMountPoint {
         &self,
         path: &Url,
         flags: IterDirFlags,
-        f: &mut dyn FnMut(DirEntry),
+        f: &mut dyn FnMut(&DirEntry),
     ) -> Result<(), Error> {
         let dir = read_dir(self.to_fs_path(path))?;
 
         for entry in dir {
             let entry = entry?;
 
-            let path = Self::fs_path_to_zefs_path(
-                &self.root.to_string_lossy(),
-                &entry.path().clone().canonicalize().unwrap(),
-            );
-
+            let path = Self::fs_path_to_zefs_path(self.root.as_path(), &entry.path());
             let path = make_url_for_zefs(self.alias(), &path).unwrap();
 
             let file_type = entry.file_type().unwrap();
@@ -159,7 +158,7 @@ impl MountPoint for StdMountPoint {
                 url: path,
             };
 
-            f(entry.clone());
+            f(&entry);
             if flags.contains(IterDirFlagBits::Recursive) && entry.ty == DirEntryType::Directory {
                 self.iter_dir(&entry.url, flags, f)?;
             }

@@ -36,6 +36,12 @@ impl D3D12Backend {
             }
         };
 
+        #[cfg(feature = "pix")]
+        ze_info!("PIX debugging enabled");
+
+        #[cfg(not(feature = "pix"))]
+        ze_info!("PIX debugging disabled");
+
         // Enable debug layers
         if let Some(debug) = debug_controller {
             unsafe {

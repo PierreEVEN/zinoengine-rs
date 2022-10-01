@@ -9,6 +9,7 @@ mod pipeline_manager;
 mod resource_manager;
 pub mod utils;
 
+#[cfg(feature = "pix")]
 mod pix {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]

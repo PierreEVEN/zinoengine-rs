@@ -21,7 +21,7 @@ use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use ze_core::maths::{RectI32, Vec2i32};
-use ze_core::ze_verbose;
+use ze_core::{ze_error, ze_verbose};
 use ze_platform::{
     Cursor, Error, KeyCode, Message, Monitor, MouseButton, Platform, SystemCursor, Window,
     WindowFlagBits, WindowFlags,
@@ -74,6 +74,7 @@ impl WindowsPlatform {
         unsafe {
             timeBeginPeriod(1);
 
+            let class_name = utf8_to_utf16(WIN_CLASS_NAME);
             let win_class = WNDCLASSEXW {
                 cbSize: size_of::<WNDCLASSEXW>() as u32,
                 style: CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS,
@@ -85,7 +86,7 @@ impl WindowsPlatform {
                 hCursor: LoadCursorW(HINSTANCE::default(), IDC_ARROW).unwrap(),
                 hbrBackground: HBRUSH(GetStockObject(BLACK_BRUSH).0),
                 lpszMenuName: Default::default(),
-                lpszClassName: PCWSTR(utf8_to_utf16(WIN_CLASS_NAME).as_ptr()),
+                lpszClassName: PCWSTR(class_name.as_ptr()),
                 hIconSm: Default::default(),
             };
             assert_ne!(RegisterClassExW(&win_class), 0);
@@ -454,11 +455,14 @@ impl Platform for WindowsPlatform {
         };
 
         unsafe {
+            let class_name = utf8_to_utf16(WIN_CLASS_NAME);
+            let window_name = utf8_to_utf16(name);
+
             AdjustWindowRectEx(&mut initial_rect, style, false, ex_style);
             let hwnd = CreateWindowExW(
                 ex_style,
-                PCWSTR(utf8_to_utf16(WIN_CLASS_NAME).as_ptr()),
-                PCWSTR(utf8_to_utf16(name).as_ptr()),
+                PCWSTR(class_name.as_ptr()),
+                PCWSTR(window_name.as_ptr()),
                 style,
                 x + initial_rect.left,
                 y + initial_rect.top,
@@ -471,6 +475,7 @@ impl Platform for WindowsPlatform {
             );
 
             if GetLastError() != NO_ERROR {
+                ze_error!("Failed to create window: {}", GetLastError().0);
                 return Err(Error::Unknown);
             }
 
