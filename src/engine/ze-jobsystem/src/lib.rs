@@ -1,13 +1,17 @@
 ﻿use crate::allocator::Allocator;
 use crossbeam::deque::{Injector, Stealer, Worker};
+use once_cell::sync::OnceCell;
 use parking_lot::{Condvar, Mutex};
+use std::fmt::{Debug, Formatter};
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
+use std::panic::AssertUnwindSafe;
+use std::process::abort;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 use std::sync::Arc;
-use std::thread;
 use std::thread::JoinHandle;
-use std::{iter, mem, ptr};
+use std::{mem, ptr};
+use std::{panic, thread};
 use ze_core::ze_info;
 
 const MAX_CONTINUATIONS: usize = 16;
@@ -18,7 +22,7 @@ const MAX_JOB_COUNT_PER_THREAD: usize = 4096;
 
 /// A shared handle to a job, each job manage a refcount
 /// This allows the user to store `JobHandle` with no problems of jobs being recycled
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct JobHandle {
     ptr: *mut Job,
 }
@@ -92,6 +96,17 @@ pub struct Job {
     userdata: [u8; MAX_USERDATA_SIZE],
 }
 
+impl Debug for Job {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Job")
+            .field("refcount", &self.refcount)
+            .field("unfinished_jobs", &self.unfinished_jobs)
+            .field("continuation_count", &self.continuation_count)
+            .field("continuations", &self.continuations)
+            .finish()
+    }
+}
+
 impl Job {
     pub fn new_inner(jobsystem: &JobSystem) -> Self {
         const EMPTY_JOB: Option<JobHandle> = None;
@@ -140,7 +155,10 @@ impl Job {
     }
 
     pub fn wait(&mut self) {
-        while !self.is_finished() {}
+        while !self.is_finished() {
+            let jobsystem = unsafe { self.jobsystem.as_mut().unwrap() };
+            jobsystem.shared_worker_data.sleep_condvar().notify_one();
+        }
     }
 
     fn finish(&mut self) {
@@ -171,6 +189,7 @@ impl Job {
 
 unsafe impl Send for Job {}
 
+#[derive(Debug)]
 struct SharedWorkerData {
     injector: Injector<JobHandle>,
 
@@ -231,7 +250,7 @@ impl WorkerThread {
             // If it's empty, try to steal a batch of jobs of the global queue
             // If it's empty, steal from other workers
             if let Some(mut job) = job_queue.pop().or_else(|| {
-                iter::repeat_with(|| {
+                std::iter::repeat_with(|| {
                     let shared_worker_data = shared_worker_data.as_ref();
                     shared_worker_data
                         .injector()
@@ -247,7 +266,12 @@ impl WorkerThread {
                 .find(|stealer| !stealer.is_retry())
                 .and_then(|stealer| stealer.success())
             }) {
-                Job::execute(&mut job);
+                panic::catch_unwind(AssertUnwindSafe(|| {
+                    Job::execute(&mut job);
+                }))
+                .unwrap_or_else(|_| {
+                    abort();
+                });
             } else {
                 // Nothing :( so sleep until another job is here!
                 let mut guard = shared_worker_data.sleep_mutex().lock();
@@ -265,7 +289,9 @@ impl WorkerThread {
             thread: Some(
                 thread::Builder::new()
                     .name(format!("Worker Thread {}", index))
-                    .spawn(move || WorkerThread::thread_main(job_queue, shared_worker_data))
+                    .spawn(move || {
+                        WorkerThread::thread_main(job_queue, shared_worker_data);
+                    })
                     .unwrap(),
             ),
         }
@@ -273,6 +299,7 @@ impl WorkerThread {
 }
 
 /// A stealing jobsystem
+#[derive(Debug)]
 pub struct JobSystem {
     worker_threads: MaybeUninit<Vec<WorkerThread>>,
     allocator: Allocator<Job>,
@@ -305,10 +332,76 @@ impl JobSystem {
         })
     }
 
-    pub fn spawn<F>(&self, f: F) -> JobHandle
+    pub fn spawn<F, R>(&self, f: F) -> JobHandle
+    where
+        F: FnOnce(&mut JobSystem, &JobHandle) -> R,
+        F: Send + 'static,
+    {
+        // SAFETY: Lifetime is statically checked thanks to the 'static lifetime bound
+        unsafe { self.spawn_unchecked(f) }
+    }
+
+    /// Create a new child job
+    /// Childs jobs must be completed before the parent can finish
+    pub fn spawn_child<F>(&self, parent: &JobHandle, f: F) -> JobHandle
     where
         F: FnOnce(&mut JobSystem, &JobHandle),
         F: Send + 'static,
+    {
+        let mut job = self.spawn(f);
+        job.parent = Some(parent.clone());
+        parent.unfinished_jobs.fetch_add(1, Ordering::SeqCst);
+        job
+    }
+
+    /// Schedule two function to be executed in jobs, waiting for the result of both
+    /// ```
+    /// let jobsystem = ze_jobsystem::JobSystem::new(ze_jobsystem::JobSystem::cpu_thread_count() - 1);
+    /// let mut a = 0;
+    /// let mut b = 0;
+    /// jobsystem.join(|| a = 20, || b = 30);
+    /// assert_eq!(a, 20);
+    /// assert_eq!(b, 30);
+    /// ```
+    pub fn join<F1, F2, R1, R2>(&self, f1: F1, f2: F2) -> (R1, R2)
+    where
+        F1: FnOnce() -> R1 + Send,
+        F2: FnOnce() -> R2 + Send,
+        R1: Send,
+        R2: Send,
+    {
+        let mut left_result = MaybeUninit::uninit();
+        let mut right_result = MaybeUninit::uninit();
+
+        // SAFETY: Lifetimes are guaranteed by the fact that we wait for the jobs to finish after scheduling them
+        let (mut left, mut right) = unsafe {
+            let left = self.spawn_unchecked(|_, _| {
+                left_result.write(f1());
+            });
+
+            let right = self.spawn_unchecked(|_, _| {
+                right_result.write(f2());
+            });
+
+            (left, right)
+        };
+
+        left.schedule();
+        right.schedule();
+        left.wait();
+        right.wait();
+
+        // SAFETY: Jobs are finished, results are initialized
+        unsafe { (left_result.assume_init(), right_result.assume_init()) }
+    }
+
+    /// Spawn a job, without any lifetime constraints
+    /// # Safety
+    /// The function or caller must guarantee correct data lifetime management
+    pub unsafe fn spawn_unchecked<F, R>(&self, f: F) -> JobHandle
+    where
+        F: FnOnce(&mut JobSystem, &JobHandle) -> R,
+        F: Send,
     {
         debug_assert!(
             mem::size_of_val(&f) <= MAX_USERDATA_SIZE,
@@ -337,19 +430,6 @@ impl JobSystem {
         });
 
         JobHandle::from(self.allocator.allocate(job))
-    }
-
-    /// Create a new child job
-    /// Childs jobs must be completed before the parent can finish
-    pub fn spawn_child<F>(&self, parent: &JobHandle, f: F) -> JobHandle
-    where
-        F: FnOnce(&mut JobSystem, &JobHandle),
-        F: Send + 'static,
-    {
-        let mut job = self.spawn(f);
-        job.parent = Some(parent.clone());
-        parent.unfinished_jobs.fetch_add(1, Ordering::SeqCst);
-        job
     }
 
     pub fn job_allocator(&mut self) -> &mut Allocator<Job> {
@@ -382,7 +462,29 @@ impl Drop for JobSystem {
 
 unsafe impl Sync for JobSystem {}
 
-pub mod allocator;
+static GLOBAL_JOBSYSTEM: OnceCell<Arc<JobSystem>> = OnceCell::new();
 
+/// Get the global jobsystem
+/// Panic if it's not initialized
+pub fn global() -> &'static Arc<JobSystem> {
+    GLOBAL_JOBSYSTEM
+        .get()
+        .expect("Global jobsystem was not initialized")
+}
+
+pub fn initialize_global(jobsystem: Arc<JobSystem>) {
+    GLOBAL_JOBSYSTEM
+        .set(jobsystem)
+        .expect("Global jobsystem was already initialized");
+}
+
+pub fn try_initialize_global(jobsystem: Arc<JobSystem>) -> Result<(), Arc<JobSystem>> {
+    GLOBAL_JOBSYSTEM.set(jobsystem)
+}
+
+pub mod allocator;
+pub mod iter;
+
+pub mod prelude;
 #[cfg(test)]
 mod tests;

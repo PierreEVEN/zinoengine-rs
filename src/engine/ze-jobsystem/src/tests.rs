@@ -5,7 +5,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 #[test]
-fn spawn_one_job() {
+fn spawn_one_job_and_wait() {
     let jobsystem = JobSystem::new(JobSystem::cpu_thread_count() - 1);
     let simple_bool = Arc::new(AtomicBool::new(false));
     {

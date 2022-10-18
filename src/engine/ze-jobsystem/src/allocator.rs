@@ -9,6 +9,7 @@ use thread_local::ThreadLocal;
 ///
 /// This allocator takes advantage of the fact that a game engine is frame-based and so N jobs will always rseult in N jobs destroyed at some point
 /// So we can use a simple counter into our array
+#[derive(Debug)]
 pub struct Allocator<T> {
     max_elements: usize,
     elements: ThreadLocal<Vec<u8>>,
