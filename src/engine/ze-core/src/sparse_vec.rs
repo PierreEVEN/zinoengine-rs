@@ -1,4 +1,5 @@
-﻿use bit_vec::BitVec;
+﻿use bitvec::macros::internal::funty::Fundamental;
+use bitvec::vec::BitVec;
 use std::ops::{Index, IndexMut};
 
 /// Wrapper around `Vec` that guarantee stable indices for elements.
@@ -7,7 +8,7 @@ use std::ops::{Index, IndexMut};
 #[derive(Debug)]
 pub struct SparseVec<T> {
     data: Vec<Option<T>>,
-    allocated_bitset: BitVec<u32>,
+    allocated_bitset: BitVec,
     len: usize,
 }
 
@@ -33,15 +34,16 @@ impl<T> SparseVec<T> {
         self.allocated_bitset.set(index, true);
     }
 
-    pub fn remove(&mut self, index: usize) -> bool {
-        if self.allocated_bitset.get(index).unwrap() {
-            self.data[index] = None;
-            self.allocated_bitset.set(index, false);
-            self.len -= 1;
-            true
-        } else {
-            false
-        }
+    /// Remove `index` from the `SparseVec`, returning the element that was there
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` is out of bounds
+    pub fn remove(&mut self, index: usize) -> T {
+        let old = self.data[index].take().expect("Invalid index");
+        self.allocated_bitset.set(index, false);
+        self.len -= 1;
+        old
     }
 
     pub fn get(&self, index: usize) -> Option<&T> {
@@ -86,7 +88,8 @@ impl<T> SparseVec<T> {
 
     pub fn grow_exact(&mut self, additional: usize) {
         self.data.resize_with(self.data.len() + additional, || None);
-        self.allocated_bitset.grow(additional, false);
+        self.allocated_bitset
+            .resize_with(self.allocated_bitset.len() + additional, |_| false);
     }
 
     /// Grow if needed to `new_capacity`
@@ -98,7 +101,7 @@ impl<T> SparseVec<T> {
 
     fn find_free_index(&self) -> Option<usize> {
         for (i, bit) in self.allocated_bitset.iter().enumerate() {
-            if !bit {
+            if bit.as_bool() {
                 return Some(i);
             }
         }
@@ -213,8 +216,8 @@ mod tests {
             array.push(i);
         }
         assert_eq!(array.len(), 500);
-
-        assert!(array.remove(350));
+        array.remove(350);
+        assert!(array.get(350).is_none());
         assert_eq!(array.len(), 499);
 
         assert_eq!(array.push(20), 350);

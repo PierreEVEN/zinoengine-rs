@@ -23,8 +23,13 @@ where
         Handle(self.slots.push(Box::new(func)))
     }
 
-    pub fn disconnect(&mut self, handle: Handle) -> bool {
-        self.slots.remove(handle.0)
+    /// Disconnect `handle`
+    ///
+    /// # Panics
+    ///
+    /// Panics if `handle` is not a valid handle
+    pub fn disconnect(&mut self, handle: Handle) {
+        let _ = self.slots.remove(handle.0);
     }
 
     pub fn emit(&mut self, args: Args) {
@@ -59,9 +64,14 @@ where
         Handle(slots.push(Box::new(func)))
     }
 
-    pub fn disconnect(&mut self, handle: Handle) -> bool {
+    /// Disconnect `handle`
+    ///
+    /// # Panics
+    ///
+    /// Panics if `handle` is not a valid handle
+    pub fn disconnect(&mut self, handle: Handle) {
         let mut slots = self.slots.lock();
-        slots.remove(handle.0)
+        let _ = slots.remove(handle.0);
     }
 
     pub fn emit(&self, args: Args) {
