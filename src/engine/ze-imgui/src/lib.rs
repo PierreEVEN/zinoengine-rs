@@ -356,7 +356,6 @@ impl Context {
 
         unsafe {
             igNewFrame();
-            igShowStyleEditor(null_mut());
         }
     }
 

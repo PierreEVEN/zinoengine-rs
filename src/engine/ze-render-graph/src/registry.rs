@@ -62,7 +62,9 @@ impl PhysicalResourceRegistry {
                 panic!("Existing resource {} is not a texture!", name)
             }
         } else {
-            let index = self.resources.add(PhysicalResource::Texture(texture, view));
+            let index = self
+                .resources
+                .push(PhysicalResource::Texture(texture, view));
             let handle = PhysicalResourceHandle(index);
             self.resource_name_map.insert(name.to_string(), handle);
             handle

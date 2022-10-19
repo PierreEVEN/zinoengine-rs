@@ -12,13 +12,25 @@ pub struct SparseVec<T> {
 }
 
 impl<T> SparseVec<T> {
-    pub fn add(&mut self, elem: T) -> usize {
+    pub fn push(&mut self, elem: T) -> usize {
         let index = self.get_or_insert_free_index();
         debug_assert!(self.data[index].is_none());
         self.data[index] = Some(elem);
         self.allocated_bitset.set(index, true);
         self.len += 1;
         index
+    }
+
+    /// Insert into the specified index, replacing whatever value was in here
+    pub fn insert(&mut self, index: usize, elem: T) {
+        assert!(index <= self.capacity());
+
+        if self.get(index).is_none() {
+            self.len += 1;
+        }
+
+        self.data[index] = Some(elem);
+        self.allocated_bitset.set(index, true);
     }
 
     pub fn remove(&mut self, index: usize) -> bool {
@@ -33,7 +45,7 @@ impl<T> SparseVec<T> {
     }
 
     pub fn get(&self, index: usize) -> Option<&T> {
-        if let Some(object) = &self.data[index] {
+        if let Some(Some(object)) = self.data.get(index) {
             Some(object)
         } else {
             None
@@ -41,7 +53,7 @@ impl<T> SparseVec<T> {
     }
 
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
-        if let Some(object) = &mut self.data[index] {
+        if let Some(Some(object)) = self.data.get_mut(index) {
             Some(object)
         } else {
             None
@@ -70,6 +82,18 @@ impl<T> SparseVec<T> {
 
     pub fn iter_mut(&mut self) -> SparseArrayIteratorMut<T> {
         SparseArrayIteratorMut::new(self)
+    }
+
+    pub fn grow_exact(&mut self, additional: usize) {
+        self.data.resize_with(self.data.len() + additional, || None);
+        self.allocated_bitset.grow(additional, false);
+    }
+
+    /// Grow if needed to `new_capacity`
+    pub fn resize(&mut self, new_len: usize) {
+        if new_len > self.len() {
+            self.grow_exact(new_len - self.len())
+        }
     }
 
     fn find_free_index(&self) -> Option<usize> {
@@ -183,25 +207,25 @@ mod tests {
     use crate::sparse_vec::SparseVec;
 
     #[test]
-    fn insert_500_remove_index_350_insert_index_350() {
+    fn push_500_remove_index_350_insert_index_350() {
         let mut array = SparseVec::default();
         for i in 0..500 {
-            array.add(i);
+            array.push(i);
         }
         assert_eq!(array.len(), 500);
 
         assert!(array.remove(350));
         assert_eq!(array.len(), 499);
 
-        assert_eq!(array.add(20), 350);
+        assert_eq!(array.push(20), 350);
         assert_eq!(array.len(), 500);
     }
 
     #[test]
-    fn insert_500_iterate_validate() {
+    fn push_500_iterate_validate() {
         let mut array = SparseVec::default();
         for i in 0..500 {
-            array.add(i);
+            array.push(i);
         }
 
         for (i, e) in array.iter().enumerate() {
@@ -210,10 +234,10 @@ mod tests {
     }
 
     #[test]
-    fn insert_500_iterate_mutate_to_200_validate() {
+    fn push_500_iterate_mutate_to_200_validate() {
         let mut array = SparseVec::default();
         for i in 0..500 {
-            array.add(i);
+            array.push(i);
         }
 
         for element in array.iter_mut() {
@@ -223,5 +247,28 @@ mod tests {
         for element in array.iter() {
             assert_eq!(*element, 200);
         }
+    }
+
+    #[test]
+    fn grow_and_insert() {
+        let mut array = SparseVec::default();
+
+        array.grow_exact(200);
+        assert_eq!(array.len(), 0);
+        assert_eq!(array.capacity(), 200);
+
+        array.insert(199, 69);
+        assert_eq!(array.len(), 1);
+        assert_eq!(array.capacity(), 200);
+
+        array.grow_exact(2000);
+
+        assert_eq!(array.capacity(), 2200);
+        array.insert(1999, 420);
+        assert_eq!(array.len(), 2);
+        assert_eq!(array.capacity(), 2200);
+
+        assert_eq!(array[199], 69);
+        assert_eq!(array[1999], 420);
     }
 }

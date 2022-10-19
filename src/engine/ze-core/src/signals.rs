@@ -20,7 +20,7 @@ where
     where
         F: FnMut(Args) + 'static,
     {
-        Handle(self.slots.add(Box::new(func)))
+        Handle(self.slots.push(Box::new(func)))
     }
 
     pub fn disconnect(&mut self, handle: Handle) -> bool {
@@ -56,7 +56,7 @@ where
         F: FnMut(Args) + Send + Sync + 'static,
     {
         let mut slots = self.slots.lock();
-        Handle(slots.add(Box::new(func)))
+        Handle(slots.push(Box::new(func)))
     }
 
     pub fn disconnect(&mut self, handle: Handle) -> bool {

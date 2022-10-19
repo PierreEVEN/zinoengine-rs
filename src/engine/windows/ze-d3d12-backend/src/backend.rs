@@ -43,13 +43,15 @@ impl D3D12Backend {
         ze_info!("PIX debugging disabled");
 
         // Enable debug layers
-        if let Some(debug) = debug_controller {
-            unsafe {
-                debug.EnableDebugLayer();
-                debug.SetEnableGPUBasedValidation(true);
-            }
+        if ENABLE_DEBUG_LAYERS {
+            if let Some(debug) = debug_controller {
+                unsafe {
+                    debug.EnableDebugLayer();
+                    debug.SetEnableGPUBasedValidation(true);
+                }
 
-            ze_info!("Using D3D12 debug layer");
+                ze_info!("Using D3D12 debug layer");
+            }
         }
 
         // Create a DXGI factory to search for compatible adapters

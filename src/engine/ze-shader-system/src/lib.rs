@@ -373,7 +373,7 @@ impl ShaderManager {
                     shader.name,
                     shader.passes.len()
                 );
-                let index = shaders.add(shader);
+                let index = shaders.push(shader);
                 let mut shader_name_to_index_map = self.shader_name_to_index_map.write();
                 shader_name_to_index_map.insert(declaration.name, index);
 
