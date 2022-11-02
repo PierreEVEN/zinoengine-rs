@@ -1,6 +1,6 @@
 //! Producer-consumer pattern as seen in the `rayon` crate
-use crate::global;
 use crate::iter::IndexedParallelIterator;
+use crate::{global, JobSystem};
 
 /// Produce a value that can be converted into a Iterator and also can be split up
 pub trait Producer: Send + Sized {
@@ -83,7 +83,7 @@ struct Splitter {
 impl Default for Splitter {
     fn default() -> Self {
         Self {
-            splits: num_cpus::get(),
+            splits: JobSystem::cpu_thread_count(),
             min_splits: 1,
         }
     }

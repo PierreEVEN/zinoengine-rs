@@ -21,15 +21,12 @@ mod tests {
     use crate::iter::slice::ParallelSlice;
     use crate::iter::ParallelIterator;
     use crate::{try_initialize_global, JobSystem};
-    use std::mem::forget;
     use std::sync::atomic::{AtomicI32, Ordering};
     use std::sync::Arc;
 
     #[test]
     fn for_each() {
-        forget(try_initialize_global(JobSystem::new(
-            JobSystem::cpu_thread_count() - 1,
-        )));
+        let _ = try_initialize_global(JobSystem::new(JobSystem::cpu_thread_count() - 1));
 
         let v = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         let sum = Arc::new(AtomicI32::new(0));

@@ -18,7 +18,7 @@ const MAX_CONTINUATIONS: usize = 16;
 const MAX_USERDATA_SIZE: usize = 128;
 
 /// Maximum amount of jobs allocated at anytime per thread
-const MAX_JOB_COUNT_PER_THREAD: usize = 4096;
+const MAX_JOB_COUNT_PER_THREAD: usize = 16384;
 
 /// A shared handle to a job, each job manage a refcount
 /// This allows the user to store `JobHandle` with no problems of jobs being recycled
@@ -332,9 +332,9 @@ impl JobSystem {
         })
     }
 
-    pub fn spawn<F, R>(&self, f: F) -> JobHandle
+    pub fn spawn<F>(&self, f: F) -> JobHandle
     where
-        F: FnOnce(&mut JobSystem, &JobHandle) -> R,
+        F: FnOnce(&mut JobSystem, &JobHandle),
         F: Send + 'static,
     {
         // SAFETY: Lifetime is statically checked thanks to the 'static lifetime bound
@@ -397,10 +397,11 @@ impl JobSystem {
 
     /// Spawn a job, without any lifetime constraints
     /// # Safety
+    ///
     /// The function or caller must guarantee correct data lifetime management
-    pub unsafe fn spawn_unchecked<F, R>(&self, f: F) -> JobHandle
+    pub unsafe fn spawn_unchecked<F>(&self, f: F) -> JobHandle
     where
-        F: FnOnce(&mut JobSystem, &JobHandle) -> R,
+        F: FnOnce(&mut JobSystem, &JobHandle),
         F: Send,
     {
         debug_assert!(

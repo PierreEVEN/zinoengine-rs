@@ -13,7 +13,7 @@ pub trait ParallelIterator: Sized + Send {
     /// use std::sync::atomic::{AtomicI32, Ordering};
     /// use ze_jobsystem::{JobSystem, try_initialize_global};
     /// use ze_jobsystem::prelude::*;
-    /// forget(try_initialize_global(JobSystem::new(JobSystem::cpu_thread_count() - 1)));
+    /// let _ = try_initialize_global(JobSystem::new(JobSystem::cpu_thread_count() - 1));
     ///
     /// let v = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     /// let sum = Arc::new(AtomicI32::new(0));
@@ -49,7 +49,7 @@ pub trait IndexedParallelIterator: ParallelIterator {
     /// use ze_jobsystem::{try_initialize_global, JobSystem};
     /// use ze_jobsystem::prelude::*;
     ///
-    /// forget(try_initialize_global(JobSystem::new(JobSystem::cpu_thread_count() - 1)));
+    /// let _ = try_initialize_global(JobSystem::new(JobSystem::cpu_thread_count() - 1));
     ///
     /// let a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     /// let b = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
@@ -77,7 +77,7 @@ pub trait IndexedParallelIterator: ParallelIterator {
     /// use ze_jobsystem::{try_initialize_global, JobSystem};
     /// use ze_jobsystem::prelude::*;
     ///
-    /// forget(try_initialize_global(JobSystem::new(JobSystem::cpu_thread_count() - 1)));
+    /// let _ = try_initialize_global(JobSystem::new(JobSystem::cpu_thread_count() - 1));
     /// let v = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     /// let indices = Mutex::new(vec![0; v.len()]);
     /// v.par_iter().enumerate().for_each(|(i, _)| {
