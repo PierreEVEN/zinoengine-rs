@@ -1,0 +1,19 @@
+[package]
+name = "ze-ecs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ze-core = { version = "0.1.0", path = "../ze-core" }
+ze-ecs-macros = { version = "0.1.0", path = "../ze-ecs-macros" }
+ze-jobsystem = { version = "0.1.0", path = "../ze-jobsystem" }
+petgraph = "0.6.2"
+bitvec = "1.0.1"
+crossbeam-channel = "0.5.6"
+puffin = { version = "0.13.3", optional = true }
+
+[features]
+default = []
+profiling = ["dep:puffin"]
