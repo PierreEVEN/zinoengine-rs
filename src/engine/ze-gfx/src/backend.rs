@@ -4,7 +4,7 @@ use raw_window_handle::RawWindowHandle;
 use std::any::Any;
 use std::sync::Arc;
 use ze_core::color::Color4f32;
-use ze_core::maths::{RectI32, Vec2f32, Vec3i32};
+use ze_core::maths::{Point2, RectI32, Vector2, Vector3};
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub enum BackendError {
@@ -179,7 +179,7 @@ pub struct BufferToTextureCopyRegion {
     pub texture_subresource_width: u32,
     pub texture_subresource_height: u32,
     pub texture_subresource_depth: u32,
-    pub texture_subresource_offset: Vec3i32,
+    pub texture_subresource_offset: Vector3<i32>,
 }
 
 pub enum IndexBufferFormat {
@@ -241,8 +241,8 @@ pub struct RenderTargetViewDesc {
 }
 
 pub struct Viewport {
-    pub position: Vec2f32,
-    pub size: Vec2f32,
+    pub position: Point2<f32>,
+    pub size: Vector2<f32>,
     pub min_depth: f32,
     pub max_depth: f32,
 }

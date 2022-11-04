@@ -5,11 +5,6 @@ use ze_core::{logger, thread};
 #[cfg(target_os = "windows")]
 ze_d3d12_backend::ze_d3d12_agility_sdk_statics!();
 
-use mimalloc::MiMalloc;
-
-#[global_allocator]
-static GLOBAL_ALLOCATOR: MiMalloc = MiMalloc;
-
 fn main() {
     puffin::set_scopes_on(true);
     thread::set_thread_name(std::thread::current().id(), "Main Thread".to_string());

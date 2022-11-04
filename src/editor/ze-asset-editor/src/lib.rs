@@ -118,11 +118,7 @@ impl AssetEditorManager {
                 flags.insert(WindowFlagBits::UnsavedDocument);
             }
 
-            if imgui.begin_window_closable(
-                &entry.editor.asset_uuid().to_string(),
-                &mut is_open,
-                flags,
-            ) {
+            if imgui.begin_window_closable(entry.source_url.path(), &mut is_open, flags) {
                 let mut context = AssetEditorDrawContext::default();
                 entry.editor.draw(imgui, &mut context);
 

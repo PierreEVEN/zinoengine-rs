@@ -71,6 +71,7 @@ impl<T: Component> Query for &T {
         ReadFetch { column: None }
     }
 
+    #[inline]
     fn set_archetype<'world>(
         fetch: &mut Self::Fetch<'world>,
         state: &Self::State,
@@ -79,6 +80,7 @@ impl<T: Component> Query for &T {
         fetch.column = Some(&archetype.columns()[*state]);
     }
 
+    #[inline]
     unsafe fn fetch<'world>(fetch: &Self::Fetch<'world>, index: usize) -> Self::Item<'world> {
         // SAFETY: Caller guarantee that components accesses are respected and therefore
         // no other system is writing to this component
@@ -122,6 +124,7 @@ impl<T: Component> Query for &mut T {
         WriteFetch { column: None }
     }
 
+    #[inline]
     fn set_archetype<'world>(
         fetch: &mut Self::Fetch<'world>,
         state: &Self::State,
@@ -130,6 +133,7 @@ impl<T: Component> Query for &mut T {
         fetch.column = Some(&archetype.columns()[*state]);
     }
 
+    #[inline]
     unsafe fn fetch<'world>(fetch: &Self::Fetch<'world>, index: usize) -> Self::Item<'world> {
         // SAFETY: Caller guarantee that components accesses are respected and therefore
         // no other system is writing to this component
@@ -177,12 +181,14 @@ macro_rules! impl_tuples {
                 ($($name::initialize_fetch(world, $name)),*)
             }
 
+            #[inline]
             fn set_archetype<'world>(fetch: &mut Self::Fetch<'world>, state: &Self::State, archetype: &'world Archetype) {
                 let ($($name,)*) = fetch;
                 let ($($state,)*) = state;
                 $($name::set_archetype($name, $state, archetype);)*
             }
 
+            #[inline]
             unsafe fn fetch<'world>(fetch: &Self::Fetch<'world>, index: usize) -> Self::Item<'world> {
                 let ($($name),*) = fetch;
                 ($($name::fetch($name, index)),*)

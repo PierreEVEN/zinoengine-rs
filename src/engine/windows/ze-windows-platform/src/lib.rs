@@ -20,7 +20,7 @@ use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use ze_core::maths::{RectI32, Vec2i32};
+use ze_core::maths::{Point2, RectI32};
 use ze_core::{ze_error, ze_verbose};
 use ze_platform::{
     Cursor, Error, KeyCode, Message, Monitor, MouseButton, Platform, SystemCursor, Window,
@@ -547,10 +547,10 @@ impl Platform for WindowsPlatform {
         }
     }
 
-    fn mouse_position(&self) -> Vec2i32 {
+    fn mouse_position(&self) -> Point2<i32> {
         let mut pos = POINT::default();
         unsafe { GetCursorPos(&mut pos) };
-        Vec2i32::new(pos.x, pos.y)
+        Point2::<i32>::new(pos.x, pos.y)
     }
 
     fn monitor_count(&self) -> usize {

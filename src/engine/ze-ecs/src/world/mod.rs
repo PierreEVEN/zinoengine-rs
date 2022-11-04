@@ -421,7 +421,7 @@ mod benches {
     use crate::world::World;
     use std::hint::black_box;
     use test::Bencher;
-    use ze_core::maths::Matrix4f32;
+    use ze_core::maths::Matrix4x4;
     use ze_jobsystem::{try_initialize_global, JobSystem};
 
     #[bench]
@@ -429,7 +429,7 @@ mod benches {
         let _ = try_initialize_global(JobSystem::new(JobSystem::cpu_thread_count() - 1));
 
         struct Counter {
-            _c: Matrix4f32,
+            _c: Matrix4x4<f64>,
         }
 
         impl Component for Counter {
@@ -446,7 +446,7 @@ mod benches {
             world.add(
                 entity,
                 Counter {
-                    _c: Matrix4f32::default(),
+                    _c: Matrix4x4::default(),
                 },
             );
         });
@@ -458,7 +458,7 @@ mod benches {
         let _ = try_initialize_global(JobSystem::new(JobSystem::cpu_thread_count() - 1));
 
         struct Counter {
-            m: Matrix4f32,
+            m: Matrix4x4<f64>,
         }
 
         impl Component for Counter {
@@ -473,7 +473,7 @@ mod benches {
             world.add(
                 entity,
                 Counter {
-                    m: Matrix4f32::identity(),
+                    m: Default::default(),
                 },
             );
         }
@@ -482,7 +482,7 @@ mod benches {
         world.add_system(
             (|mut query: SystemQuery<&mut Counter>| {
                 query.for_each(|mut counter| {
-                    counter.m = counter.m * Matrix4f32::identity();
+                    counter.m = counter.m * Matrix4x4::default();
                 });
             })
             .in_set("main_set")
@@ -500,7 +500,7 @@ mod benches {
         let _ = try_initialize_global(JobSystem::new(JobSystem::cpu_thread_count() - 1));
 
         struct Counter {
-            m: Matrix4f32,
+            m: Matrix4x4<f64>,
         }
 
         impl Component for Counter {
@@ -524,7 +524,7 @@ mod benches {
         world.add_system(
             (|mut query: SystemQuery<&mut Counter>| {
                 query.par_for_each(|mut counter| {
-                    counter.m = counter.m * Matrix4f32::identity();
+                    counter.m = counter.m * Matrix4x4::default();
                 });
             })
             .in_set("main_set")

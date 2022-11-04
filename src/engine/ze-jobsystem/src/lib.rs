@@ -467,6 +467,7 @@ static GLOBAL_JOBSYSTEM: OnceCell<Arc<JobSystem>> = OnceCell::new();
 
 /// Get the global jobsystem
 /// Panic if it's not initialized
+#[inline]
 pub fn global() -> &'static Arc<JobSystem> {
     GLOBAL_JOBSYSTEM
         .get()

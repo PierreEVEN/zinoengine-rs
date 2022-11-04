@@ -38,8 +38,8 @@ impl Editor {
             .texture_size_in_bytes(texture.width(), texture.height());
 
         imgui.text(&format!(
-            "Size in VRAM (mip 0): {} Kb",
-            (texture_size as f32 * 0.001).trunc()
+            "Size in VRAM (mip 0): {:.3} Mb",
+            texture_size as f32 / 1e+6
         ));
         imgui.text(&format!("Format: {}", texture.format()));
         imgui.text(&format!("Mip levels: {}", texture.mip_levels().len()));

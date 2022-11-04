@@ -5,7 +5,7 @@ use std::sync::Arc;
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use ze_core::maths::Vec2i32;
+use ze_core::maths::Point2;
 use ze_platform::Window;
 
 pub struct WindowsWindow {
@@ -67,7 +67,7 @@ impl Drop for WindowsWindow {
 }
 
 impl Window for WindowsWindow {
-    fn set_position(&self, position: Vec2i32) {
+    fn set_position(&self, position: Point2<i32>) {
         unsafe {
             SetWindowPos(
                 self.hwnd,
@@ -135,7 +135,7 @@ impl Window for WindowsWindow {
         self.height.load(Ordering::SeqCst)
     }
 
-    fn position(&self) -> Vec2i32 {
-        Vec2i32::new(self.x.load(Ordering::SeqCst), self.y.load(Ordering::SeqCst))
+    fn position(&self) -> Point2<i32> {
+        Point2::<i32>::new(self.x.load(Ordering::SeqCst), self.y.load(Ordering::SeqCst))
     }
 }

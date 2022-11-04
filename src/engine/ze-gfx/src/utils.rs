@@ -5,7 +5,7 @@
 };
 use std::ptr;
 use std::sync::Arc;
-use ze_core::maths::Vec3i32;
+use ze_core::maths::Vector3;
 
 /// Copy data over to a buffer (using a staging buffer if required)
 /// The source buffer MUST be in the Common state
@@ -130,7 +130,7 @@ pub fn copy_data_to_texture(
             texture_subresource_width: texture.desc.width,
             texture_subresource_height: texture.desc.height,
             texture_subresource_depth: texture.desc.depth,
-            texture_subresource_offset: Vec3i32::default(),
+            texture_subresource_offset: Vector3::<i32>::default(),
         }],
     );
     device.submit(QueueType::Transfer, &[&cmd_list], &[], &[]);

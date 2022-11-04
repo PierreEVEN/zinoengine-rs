@@ -8,7 +8,7 @@ use std::os::raw::*;
 use std::ptr::null_mut;
 use std::sync::Arc;
 use std::{mem, slice};
-use ze_core::maths::{Matrix4f32, RectI32, Vec2f32, Vec2i32};
+use ze_core::maths::{Matrix4x4, Point2, RectI32, Vector2};
 use ze_core::{ze_verbose};
 use ze_gfx::backend::*;
 use ze_gfx::{utils, PixelFormat, SampleDesc};
@@ -325,7 +325,7 @@ impl Context {
     pub fn begin_frame(
         &mut self,
         delta_time: f32,
-        mouse_position: Vec2i32,
+        mouse_position: Point2<i32>,
         main_viewport_window: &dyn Window,
     ) {
         unsafe {
@@ -1376,7 +1376,7 @@ fn draw_viewport_internal(
 ) {
     #[repr(C)]
     struct ShaderData {
-        projection_matrix: Matrix4f32,
+        projection_matrix: Matrix4x4<f32>,
         base_vertex_location: u32,
         vertex_buffer: u32,
         texture: u32,
@@ -1397,7 +1397,7 @@ fn draw_viewport_internal(
                 let right = draw_data.DisplayPos.x + draw_data.DisplaySize.x;
                 let top = draw_data.DisplayPos.y;
                 let bottom = draw_data.DisplayPos.y + draw_data.DisplaySize.y;
-                Matrix4f32::new([
+                Matrix4x4::<f32>::from([
                     [2.0 / (right - left), 0.0, 0.0, 0.0],
                     [0.0, 2.0 / (top - bottom), 0.0, 0.0],
                     [0.0, 0.0, 0.5, 0.0],
@@ -1439,8 +1439,8 @@ fn draw_viewport_internal(
             device.cmd_set_viewports(
                 cmd_list,
                 &[ze_gfx::backend::Viewport {
-                    position: Vec2f32::default(),
-                    size: Vec2f32::new(draw_data.DisplaySize.x, draw_data.DisplaySize.y),
+                    position: Default::default(),
+                    size: Vector2::<f32>::new(draw_data.DisplaySize.x, draw_data.DisplaySize.y),
                     min_depth: 0.0,
                     max_depth: 1.0,
                 }],
@@ -1464,12 +1464,12 @@ fn draw_viewport_internal(
                 for cmd in cmd_buffers {
                     let clip_offset = draw_data.DisplayPos;
 
-                    let clip_min = Vec2i32::new(
+                    let clip_min = Vector2::<i32>::new(
                         (cmd.ClipRect.x - clip_offset.x) as i32,
                         (cmd.ClipRect.y - clip_offset.y) as i32,
                     );
 
-                    let clip_max = Vec2i32::new(
+                    let clip_max = Vector2::<i32>::new(
                         (cmd.ClipRect.z - clip_offset.x) as i32,
                         (cmd.ClipRect.w - clip_offset.y) as i32,
                     );
@@ -1567,7 +1567,7 @@ unsafe extern "C" fn platform_set_window_pos(vp: *mut ImGuiViewport, pos: ImVec2
 
     platform_user_data
         .window
-        .set_position(Vec2i32::new(pos.x as i32, pos.y as i32));
+        .set_position(Point2::<i32>::new(pos.x as i32, pos.y as i32));
 }
 
 unsafe extern "C" fn platform_set_window_size(vp: *mut ImGuiViewport, size: ImVec2) {

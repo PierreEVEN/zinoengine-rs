@@ -11,7 +11,6 @@ use std::time::Instant;
 use url::Url;
 use ze_asset_server::{AssetServer, AssetServerProvider};
 use ze_asset_system::AssetManager;
-use ze_core::maths::{Vec2f32, Vec2u32};
 use ze_core::type_uuid::{TypeUuid, Uuid};
 use ze_core::ze_info;
 use ze_filesystem::mount_points::StdMountPoint;

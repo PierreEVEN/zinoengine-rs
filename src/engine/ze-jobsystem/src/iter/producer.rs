@@ -81,6 +81,7 @@ struct Splitter {
 }
 
 impl Default for Splitter {
+    #[inline]
     fn default() -> Self {
         Self {
             splits: JobSystem::cpu_thread_count(),
@@ -90,6 +91,7 @@ impl Default for Splitter {
 }
 
 impl Splitter {
+    #[inline]
     fn try_split(&mut self) -> bool {
         if self.splits > self.min_splits {
             self.splits /= 2;
@@ -114,6 +116,7 @@ pub(crate) fn connect_producer_to_consumer<P: Producer, C: Consumer<P::Item>>(
     producer: P,
     consumer: C,
 ) -> C::Result {
+    #[inline]
     fn splitter_impl<P: Producer, C: Consumer<P::Item>>(
         len: usize,
         mut splitter: Splitter,
