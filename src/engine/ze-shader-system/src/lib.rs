@@ -156,25 +156,42 @@ impl CompilationManager {
 
         for stage in &pass.stages {
             if let ShaderStageSourceData::Hlsl(code) = &stage.source_data {
+                struct CompilationData {
+                    shader: Arc<CompilingShader>,
+                    code: String,
+                    shader_compiler: Arc<dyn ShaderCompiler>,
+                    stage_type: ShaderStageFlagBits,
+                    callback: Box<dyn FnMut(Arc<CompilingShader>) + Send + Sync + 'static>,
+                }
+
                 let shader = shader.clone();
-                let shaders = self.shaders.clone();
                 let code = code.clone();
-                let stage_type = stage.stage;
-                let shader_compiler = self.shader_compiler.clone();
-                let mut callback = callback.clone();
+
+                let mut compilation_data = Box::new(CompilationData {
+                    shader: shader.clone(),
+                    code: code.clone(),
+                    shader_compiler: self.shader_compiler.clone(),
+                    stage_type: stage.stage,
+                    callback: Box::new(callback.clone()),
+                });
+
+                let shaders = self.shaders.clone();
                 self.jobsystem
                     .spawn(move |_, _| {
-                        let output = shader_compiler.compile_shader(ShaderCompilerInput {
-                            name: &shader.name,
-                            stage: stage_type,
-                            code: code.as_bytes(),
-                            entry_point: "main",
-                        });
+                        let output =
+                            compilation_data
+                                .shader_compiler
+                                .compile_shader(ShaderCompilerInput {
+                                    name: &compilation_data.shader.name,
+                                    stage: compilation_data.stage_type,
+                                    code: compilation_data.code.as_bytes(),
+                                    entry_point: "main",
+                                });
 
                         match output {
                             Ok(output) => {
                                 let mut bytecodes = shader.bytecodes.lock();
-                                bytecodes.push((stage_type, output.bytecode));
+                                bytecodes.push((compilation_data.stage_type, output.bytecode));
                             }
                             Err(errors) => {
                                 let mut error_message = String::new();
@@ -185,7 +202,7 @@ impl CompilationManager {
                                 ze_error!(
                                     "Failed to compile shader {} stage {:?}: {}",
                                     shader.name,
-                                    stage_type,
+                                    compilation_data.stage_type,
                                     error_message
                                 );
                             }
@@ -193,7 +210,7 @@ impl CompilationManager {
 
                         shader.processed_stages.fetch_add(1, Ordering::SeqCst);
                         if shader.processed_stages.load(Ordering::SeqCst) == shader.stage_count {
-                            callback(shader.clone());
+                            (*compilation_data.callback)(shader.clone());
                             shaders.lock().remove(&key);
                         }
                     })

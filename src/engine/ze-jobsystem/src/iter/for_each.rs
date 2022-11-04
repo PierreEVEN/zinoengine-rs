@@ -45,6 +45,7 @@ impl<'a, T, F: Fn(T) + Sync> UnindexedConsumer<T> for ForEachConsumer<'a, F> {
 impl<'a, T, F: Fn(T) + Sync> Folder<T> for ForEachConsumer<'a, F> {
     type Result = ();
 
+    #[inline]
     fn consume(self, item: T) -> Self {
         (self.f)(item);
         self
