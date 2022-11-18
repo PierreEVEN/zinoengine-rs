@@ -1,6 +1,6 @@
 ﻿use crate::erased_vec::{TypeErasedVec, TypeInfo};
 use std::ops::Index;
-use std::ptr::Unique;
+use std::ptr::NonNull;
 use ze_core::sparse_vec::SparseVec;
 
 /// A data structure relying on two arrays:
@@ -77,7 +77,7 @@ impl TypeErasedSparseSet {
     /// # Safety
     ///
     /// `value` must point to a valid value with a correct layout
-    pub unsafe fn insert_unchecked(&mut self, index: usize, value: Unique<u8>) -> usize {
+    pub unsafe fn insert_unchecked(&mut self, index: usize, value: NonNull<u8>) -> usize {
         let dense_index = self.dense.len();
         self.sparse.resize(index + 1);
         self.sparse.insert(index, dense_index);
@@ -165,7 +165,7 @@ mod tests {
         use crate::erased_vec::TypeInfo;
         use crate::sparse_set::TypeErasedSparseSet;
         use std::mem::forget;
-        use std::ptr::Unique;
+        use std::ptr::NonNull;
 
         fn insert_typed<T: 'static>(
             sparse_set: &mut TypeErasedSparseSet,
@@ -177,7 +177,7 @@ mod tests {
                 // SAFETY: we assert if layout is invalid
                 sparse_set.insert_unchecked(
                     index,
-                    Unique::new(&value as *const T as *mut T as *mut u8).expect("value was null!"),
+                    NonNull::new(&value as *const T as *mut T as *mut u8).expect("value was null!"),
                 )
             };
             forget(value);

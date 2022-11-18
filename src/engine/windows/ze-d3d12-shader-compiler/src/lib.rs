@@ -51,6 +51,7 @@ impl ShaderCompiler for D3D12ShaderCompiler {
             ShaderStageFlagBits::Vertex => "vs_6_6",
             ShaderStageFlagBits::Fragment => "ps_6_6",
             ShaderStageFlagBits::Compute => "cs_6_6",
+            ShaderStageFlagBits::Mesh => "ms_6_6",
         };
 
         let compiler = self.dxc.create_compiler().unwrap();
@@ -58,6 +59,10 @@ impl ShaderCompiler for D3D12ShaderCompiler {
 
         let blob = library.create_blob_with_encoding(input.code).unwrap();
 
+        #[cfg(debug_assertions)]
+        let args = ["-Qstrip_reflect", "-WX", "-HV 2021", "-Zi"];
+
+        #[cfg(not(debug_assertions))]
         let args = ["-Qstrip_reflect", "-Qstrip_debug", "-WX", "-HV 2021", "-Zi"];
 
         let mut include_handler = IncludeHandler::new(&self.filesystem);

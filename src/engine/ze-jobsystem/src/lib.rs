@@ -1,6 +1,4 @@
-﻿#![feature(sync_unsafe_cell)]
-
-use crate::job::{JobHandle, MAX_CONTINUATIONS, MAX_USERDATA_SIZE};
+﻿use crate::job::{JobHandle, MAX_CONTINUATIONS, MAX_USERDATA_SIZE};
 use crate::job_allocator::JobAllocator;
 use crate::worker_thread::WorkerThread;
 use crossbeam::deque::{Injector, Stealer, Worker};
@@ -43,6 +41,7 @@ impl SharedWorkerData {
         self.sleep_condvar.notify_all();
     }
 
+    #[inline]
     fn has_any_jobs(&self) -> bool {
         !self.injector.is_empty() || self.stealers.iter().any(|stealer| !stealer.is_empty())
     }
@@ -158,7 +157,7 @@ impl JobSystem {
             f: F,
         }
 
-        debug_assert!(
+        assert!(
             mem::size_of::<PackedUserdata<F>>() <= MAX_USERDATA_SIZE,
             "Userdata max size exceeded! {} out of {} bytes max.",
             mem::size_of::<PackedUserdata<F>>(),
@@ -178,11 +177,9 @@ impl JobSystem {
             });
         }
 
-        job.function = MaybeUninit::new(|job| {
-            let userdata = unsafe {
-                let ptr = job.userdata.as_ptr() as *const PackedUserdata<F>;
-                ptr.read()
-            };
+        job.function = MaybeUninit::new(|mut job| {
+            let ptr = job.userdata.as_mut_ptr() as *mut PackedUserdata<F>;
+            let userdata = unsafe { ptr.read() };
 
             (userdata.f)(&*userdata.jobsystem, job);
         });

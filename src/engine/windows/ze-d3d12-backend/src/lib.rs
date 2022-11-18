@@ -3,11 +3,11 @@ extern crate core;
 pub mod backend;
 mod command_manager;
 mod descriptor_manager;
-pub mod device;
+mod device;
 mod frame_manager;
 mod pipeline_manager;
 mod resource_manager;
-pub mod utils;
+mod utils;
 
 #[cfg(feature = "pix")]
 mod pix {

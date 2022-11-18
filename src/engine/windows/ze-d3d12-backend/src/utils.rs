@@ -1,12 +1,12 @@
-﻿use gpu_allocator::AllocationError;
-use std::ops::Deref;
+﻿use std::ops::Deref;
 use windows::core::*;
 use windows::Win32;
 use windows::Win32::Graphics::Direct3D12::*;
 use windows::Win32::Graphics::Dxgi::Common::*;
 use ze_gfx::backend::{
-    CompareOp, DeviceError, Filter, MemoryLocation, RenderPassTextureLoadMode,
-    RenderPassTextureStoreMode, ResourceState, TextureAddressMode,
+    CompareOp, DeviceError, Filter, MemoryLocation, PipelineStencilOpState,
+    RenderPassTextureLoadMode, RenderPassTextureStoreMode, ResourceState, StencilOp,
+    TextureAddressMode,
 };
 use ze_gfx::{PixelFormat, SampleDesc};
 
@@ -38,22 +38,10 @@ impl<T: Interface> Deref for SendableIUnknown<T> {
 }
 
 // Utils conversion functions
-pub fn get_gpu_allocator_memory_location(
-    memory_location: MemoryLocation,
-) -> gpu_allocator::MemoryLocation {
+pub fn get_heap_type_from_memory_location(memory_location: MemoryLocation) -> D3D12_HEAP_TYPE {
     match memory_location {
-        MemoryLocation::CpuToGpu => gpu_allocator::MemoryLocation::CpuToGpu,
-        MemoryLocation::GpuOnly => gpu_allocator::MemoryLocation::GpuOnly,
-    }
-}
-pub fn get_ze_device_error_from_gpu_allocator_error(error: AllocationError) -> DeviceError {
-    match error {
-        AllocationError::OutOfMemory => DeviceError::OutOfMemory,
-        AllocationError::FailedToMap(_) => DeviceError::Unknown,
-        AllocationError::NoCompatibleMemoryTypeFound => DeviceError::NoCompatibleMemoryTypeFound,
-        AllocationError::InvalidAllocationCreateDesc => DeviceError::Unknown,
-        AllocationError::InvalidAllocatorCreateDesc(_) => DeviceError::Unknown,
-        AllocationError::Internal(_) => DeviceError::Unknown,
+        MemoryLocation::CpuToGpu => D3D12_HEAP_TYPE_UPLOAD,
+        MemoryLocation::GpuOnly => D3D12_HEAP_TYPE_DEFAULT,
     }
 }
 
@@ -64,6 +52,7 @@ pub fn get_dxgi_format_from_ze_format(format: PixelFormat) -> DXGI_FORMAT {
         PixelFormat::B8G8R8A8Unorm => DXGI_FORMAT_B8G8R8A8_UNORM,
         PixelFormat::R8Unorm => DXGI_FORMAT_R8_UNORM,
         PixelFormat::R8G8B8A8Unorm => DXGI_FORMAT_R8G8B8A8_UNORM,
+        PixelFormat::D24UnormS8Uint => DXGI_FORMAT_D24_UNORM_S8_UINT,
         _ => todo!(),
     }
 }
@@ -75,6 +64,7 @@ pub fn get_ze_format_from_dxgi_format(format: DXGI_FORMAT) -> PixelFormat {
         DXGI_FORMAT_B8G8R8A8_UNORM => PixelFormat::B8G8R8A8Unorm,
         DXGI_FORMAT_R8_UNORM => PixelFormat::R8Unorm,
         DXGI_FORMAT_R8G8B8A8_UNORM => PixelFormat::R8G8B8A8Unorm,
+        DXGI_FORMAT_D24_UNORM_S8_UINT => PixelFormat::D24UnormS8Uint,
         _ => todo!(),
     }
 }
@@ -173,5 +163,27 @@ pub fn get_d3d_compare_func_from_ze_compare_op(op: CompareOp) -> D3D12_COMPARISO
         CompareOp::NotEqual => D3D12_COMPARISON_FUNC_NOT_EQUAL,
         CompareOp::GreaterEqual => D3D12_COMPARISON_FUNC_GREATER_EQUAL,
         CompareOp::Always => D3D12_COMPARISON_FUNC_ALWAYS,
+    }
+}
+
+pub fn get_d3d_stencil_op(op: StencilOp) -> D3D12_STENCIL_OP {
+    match op {
+        StencilOp::Keep => D3D12_STENCIL_OP_KEEP,
+        StencilOp::Zero => D3D12_STENCIL_OP_ZERO,
+        StencilOp::Replace => D3D12_STENCIL_OP_REPLACE,
+        StencilOp::IncrementAndClamp => D3D12_STENCIL_OP_INCR_SAT,
+        StencilOp::DecrementAndClamp => D3D12_STENCIL_OP_DECR_SAT,
+        StencilOp::Invert => D3D12_STENCIL_OP_INVERT,
+        StencilOp::IncrementAndWrap => D3D12_STENCIL_OP_INCR,
+        StencilOp::DecrementAndWrap => D3D12_STENCIL_OP_DECR,
+    }
+}
+
+pub fn get_d3d_depth_stencil_op_desc(state: &PipelineStencilOpState) -> D3D12_DEPTH_STENCILOP_DESC {
+    D3D12_DEPTH_STENCILOP_DESC {
+        StencilFailOp: get_d3d_stencil_op(state.fail_op),
+        StencilDepthFailOp: get_d3d_stencil_op(state.depth_fail_op),
+        StencilPassOp: get_d3d_stencil_op(state.pass_op),
+        StencilFunc: get_d3d_compare_func_from_ze_compare_op(state.compare_op),
     }
 }

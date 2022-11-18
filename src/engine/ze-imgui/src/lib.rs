@@ -143,8 +143,9 @@ impl Context {
                         format: PixelFormat::R8G8B8A8Unorm,
                         sample_desc: Default::default(),
                         usage_flags: TextureUsageFlags::default(),
-                        memory_location: MemoryLocation::GpuOnly,
+                        memory_desc: MemoryDesc { memory_location: MemoryLocation::GpuOnly, memory_flags: Default::default() }
                     },
+                    None,
                     "ImGui Font texture",
                 )
                 .expect("Failed to create ImGui font texture");
@@ -164,14 +165,12 @@ impl Context {
         };
 
         let font_texture_view = device
-            .create_shader_resource_view(&ShaderResourceViewDesc {
-                resource: ShaderResourceViewResource::Texture(font_texture.clone()),
+            .create_shader_resource_view(&ShaderResourceViewDesc::Texture2D(Texture2DSRV {
+                texture: font_texture.clone(),
                 format: PixelFormat::R8G8B8A8Unorm,
-                ty: ShaderResourceViewType::Texture2D(Texture2DSRV {
-                    min_mip_level: 0,
-                    mip_levels: 1,
-                }),
-            })
+                min_mip_level: 0,
+                mip_levels: 1
+            }))
             .expect("Failed to create ImGui font texture view");
 
         let cursors = [
@@ -425,7 +424,7 @@ impl Context {
                     self.device.cmd_begin_render_pass(
                         cmd_list,
                         &RenderPassDesc {
-                            render_targets: &[RenderPassTexture {
+                            render_targets: &[RenderPassRenderTarget {
                                 render_target_view: &views[backbuffer_index as usize],
                                 load_mode: RenderPassTextureLoadMode::Clear,
                                 store_mode: RenderPassTextureStoreMode::Preserve,

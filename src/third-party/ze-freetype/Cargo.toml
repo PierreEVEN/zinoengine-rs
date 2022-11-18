@@ -1,8 +1,0 @@
-[package]
-name = "ze-freetype"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-ze-freetype-sys = { path = "../ze-freetype-sys" }
-enumflags2 = "0.7.5"

@@ -3,7 +3,8 @@ use crate::system::schedule::Schedule;
 use crate::world::World;
 use bitvec::prelude::BitVec;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use std::cell::{RefCell, SyncUnsafeCell};
+use std::cell::RefCell;
+use ze_core::sync::SyncUnsafeCell;
 use ze_jobsystem::global;
 
 pub trait Executor {

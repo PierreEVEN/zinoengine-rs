@@ -17,7 +17,7 @@ pub trait Query {
     fn initialize_fetch<'world>(world: &'world World, state: &Self::State) -> Self::Fetch<'world>;
 
     /// Set the next archetype to fetch from
-    fn set_archetype<'world>(
+    fn prepare_fetch<'world>(
         fetch: &mut Self::Fetch<'world>,
         state: &Self::State,
         archetype: &'world Archetype,
@@ -63,16 +63,18 @@ impl<T: Component> Query for &T {
     type Fetch<'world> = ReadFetch<'world>;
     type State = ComponentId;
 
+    #[inline]
     fn initialize_state(_: &World) -> Self::State {
         T::component_id()
     }
 
+    #[inline]
     fn initialize_fetch<'world>(_: &'world World, _: &Self::State) -> Self::Fetch<'world> {
         ReadFetch { column: None }
     }
 
     #[inline]
-    fn set_archetype<'world>(
+    fn prepare_fetch<'world>(
         fetch: &mut Self::Fetch<'world>,
         state: &Self::State,
         archetype: &'world Archetype,
@@ -116,16 +118,18 @@ impl<T: Component> Query for &mut T {
     type Fetch<'world> = WriteFetch<'world>;
     type State = ComponentId;
 
+    #[inline]
     fn initialize_state(_: &World) -> Self::State {
         T::component_id()
     }
 
+    #[inline]
     fn initialize_fetch<'world>(_: &'world World, _: &Self::State) -> Self::Fetch<'world> {
         WriteFetch { column: None }
     }
 
     #[inline]
-    fn set_archetype<'world>(
+    fn prepare_fetch<'world>(
         fetch: &mut Self::Fetch<'world>,
         state: &Self::State,
         archetype: &'world Archetype,
@@ -172,20 +176,22 @@ macro_rules! impl_tuples {
             type Fetch<'world> = ($($name::Fetch<'world>,)*);
             type State = ($($name::State,)*);
 
+            #[inline]
             fn initialize_state<'world>(world: &'world World) -> Self::State {
                 ($($name::initialize_state(world)),*)
             }
 
+            #[inline]
             fn initialize_fetch<'world>(world: &'world World, state: &Self::State) -> Self::Fetch<'world> {
                 let ($($name),*) = state;
                 ($($name::initialize_fetch(world, $name)),*)
             }
 
             #[inline]
-            fn set_archetype<'world>(fetch: &mut Self::Fetch<'world>, state: &Self::State, archetype: &'world Archetype) {
+            fn prepare_fetch<'world>(fetch: &mut Self::Fetch<'world>, state: &Self::State, archetype: &'world Archetype) {
                 let ($($name,)*) = fetch;
                 let ($($state,)*) = state;
-                $($name::set_archetype($name, $state, archetype);)*
+                $($name::prepare_fetch($name, $state, archetype);)*
             }
 
             #[inline]
@@ -194,11 +200,13 @@ macro_rules! impl_tuples {
                 ($($name::fetch($name, index)),*)
             }
 
+            #[inline]
             fn archetype_contains_component<'world, F: Fn(&ComponentId) -> bool>(state: &Self::State, f: F) -> bool {
                 let ($($name),*) = state;
                 true $(&& $name::archetype_contains_component($name, &f))*
             }
 
+            #[inline]
             fn update_archetype_access(state: &Self::State, archetype: &Archetype, access: &mut Access) {
                 let ($($name,)*) = state;
                 $($name::update_archetype_access($name, archetype, access);)*
@@ -209,4 +217,5 @@ macro_rules! impl_tuples {
 
 repeat_tuples!(impl_tuples, 8, F, S);
 
+mod filter;
 pub mod state;

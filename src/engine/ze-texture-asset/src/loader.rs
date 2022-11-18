@@ -4,11 +4,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 use ze_asset_system::loader::{AssetLoader, Error};
 use ze_asset_system::Asset;
-use ze_gfx::backend::{
-    Device, MemoryLocation, ResourceState, ShaderResourceViewDesc, ShaderResourceViewResource,
-    ShaderResourceViewType, Texture2DSRV, TextureDesc, TextureUsageFlags,
-};
-use ze_gfx::utils;
+use ze_gfx::backend::*;
+use ze_gfx::{utils, PixelFormat};
 
 pub struct TextureLoader {
     device: Arc<dyn Device>,
@@ -42,8 +39,12 @@ impl AssetLoader for TextureLoader {
                 format: texture.format,
                 sample_desc: Default::default(),
                 usage_flags: TextureUsageFlags::empty(),
-                memory_location: MemoryLocation::GpuOnly,
+                memory_desc: MemoryDesc {
+                    memory_location: MemoryLocation::GpuOnly,
+                    memory_flags: Default::default(),
+                },
             },
+            None,
             &uuid.to_string(),
         ) {
             Ok(texture) => Some(Arc::new(texture)),
@@ -66,14 +67,12 @@ impl AssetLoader for TextureLoader {
         texture.default_srv =
             match self
                 .device
-                .create_shader_resource_view(&ShaderResourceViewDesc {
-                    resource: ShaderResourceViewResource::Texture(texture_handle.unwrap()),
-                    format: texture.format,
-                    ty: ShaderResourceViewType::Texture2D(Texture2DSRV {
-                        min_mip_level: 0,
-                        mip_levels: 1,
-                    }),
-                }) {
+                .create_shader_resource_view(&ShaderResourceViewDesc::Texture2D(Texture2DSRV {
+                    texture: texture_handle.unwrap(),
+                    format: PixelFormat::R8G8B8A8Unorm,
+                    min_mip_level: 0,
+                    mip_levels: texture.mip_levels.len() as u32,
+                })) {
                 Ok(srv) => Some(Arc::new(srv)),
                 Err(_) => return Err(Error::CannotDeserialize),
             };

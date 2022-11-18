@@ -11,10 +11,13 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
     let type_name = &ast.ident;
 
     let out = quote! {
-        impl Component for #type_name {
-            fn component_id() -> ComponentId {
-                static ID: usize = ze_ecs::component::COMPONENT_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
-                ID
+        impl ze_ecs::component::Component for #type_name {
+            fn component_id() -> ze_ecs::component::ComponentId {
+                static ID: ze_ecs::Lazy<ze_ecs::component::ComponentId> = ze_ecs::Lazy::new(|| {
+                    ze_ecs::component::COMPONENT_ID_COUNTER
+                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                });
+                *ID
             }
         }
     };

@@ -101,6 +101,19 @@ impl<T: MatrixNumber> From<Vector2<T>> for [T; 2] {
 }
 
 pub type Vector3<T> = Vector<T, 3>;
+
+impl<T: MatrixNumber> Vector3<T> {
+    pub fn new(x: T, y: T, z: T) -> Self {
+        Self([[x, y, z]].into())
+    }
+}
+
+impl<T: MatrixNumber> From<Vector3<T>> for [T; 3] {
+    fn from(value: Vector3<T>) -> Self {
+        [value.x, value.y, value.z]
+    }
+}
+
 pub type Vector4<T> = Vector<T, 4>;
 
 impl<T: MatrixNumber> Vector4<T> {

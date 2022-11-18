@@ -19,6 +19,31 @@ fn spawn_one_job_and_wait() {
 }
 
 #[test]
+fn drop() {
+    let jobsystem = JobSystem::new(JobSystem::cpu_thread_count() - 1);
+
+    struct TestDrop {
+        dropped: AtomicBool,
+    }
+
+    let drop_test = Arc::new(TestDrop {
+        dropped: Default::default(),
+    });
+
+    {
+        let drop_test = drop_test.clone();
+        let job = jobsystem
+            .spawn(move |_, _| {
+                assert_eq!(Arc::strong_count(&drop_test), 2);
+            })
+            .schedule();
+        jobsystem.wait_for(&[job]);
+    }
+
+    assert_eq!(Arc::strong_count(&drop_test), 1);
+}
+
+#[test]
 fn spawn_one_job_five_childs() {
     let jobsystem = JobSystem::new(JobSystem::cpu_thread_count() - 1);
     let counter = Arc::new(AtomicU32::new(0));

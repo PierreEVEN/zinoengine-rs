@@ -1,6 +1,6 @@
 ﻿use crate::backend::{
     Buffer, BufferCopyRegion, BufferDesc, BufferToTextureCopyRegion, BufferUsageFlags, Device,
-    DeviceError, MemoryLocation, QueueType, ResourceBarrier, ResourceState,
+    DeviceError, MemoryDesc, MemoryLocation, QueueType, ResourceBarrier, ResourceState,
     ResourceTransitionBarrier, ResourceTransitionBarrierResource, Texture,
 };
 use std::ptr;
@@ -23,14 +23,18 @@ pub fn copy_data_to_buffer(
             || dst_resource_state == ResourceState::CopyWrite
     );
 
-    if buffer.info.memory_location != MemoryLocation::CpuToGpu {
+    if buffer.info.memory_desc.memory_location != MemoryLocation::CpuToGpu {
         let staging = device.create_buffer(
             &BufferDesc {
                 size_bytes: buffer.info.size_bytes,
                 usage: BufferUsageFlags::default(),
-                memory_location: MemoryLocation::CpuToGpu,
+                memory_desc: MemoryDesc {
+                    memory_location: MemoryLocation::CpuToGpu,
+                    memory_flags: Default::default(),
+                },
                 default_resource_state: ResourceState::CopyRead,
             },
+            None,
             "copy_data_to_buffer Staging buffer",
         )?;
         copy_data_to_buffer(device, &staging, data, dst_resource_state)?;
@@ -93,9 +97,13 @@ pub fn copy_data_to_texture(
         &BufferDesc {
             size_bytes: subresource_layout.size_in_bytes,
             usage: BufferUsageFlags::default(),
-            memory_location: MemoryLocation::CpuToGpu,
+            memory_desc: MemoryDesc {
+                memory_location: MemoryLocation::CpuToGpu,
+                memory_flags: Default::default(),
+            },
             default_resource_state: ResourceState::CopyRead,
         },
+        None,
         "copy_data_to_texture Staging buffer",
     )?;
 

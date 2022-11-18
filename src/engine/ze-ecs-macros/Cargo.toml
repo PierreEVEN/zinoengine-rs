@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 syn = "1.0.101"
 quote = "1.0.21"
+once_cell = "1.16.0"
 
 [lib]
 proc-macro = true

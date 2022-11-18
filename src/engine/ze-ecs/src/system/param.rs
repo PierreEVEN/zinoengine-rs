@@ -1,7 +1,7 @@
 use crate::access::Access;
 use crate::archetype::Archetype;
 use crate::world::World;
-use std::cell::SyncUnsafeCell;
+use ze_core::sync::SyncUnsafeCell;
 use ze_ecs_macros::repeat_tuples_no_skip;
 
 /// Parameter of a [`System`], that can be fetched later on

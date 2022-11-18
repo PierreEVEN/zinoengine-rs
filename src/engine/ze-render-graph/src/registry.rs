@@ -1,119 +1,107 @@
-﻿use crate::TextureInfo;
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+﻿use crate::FrameGraphTextureDesc;
 use std::sync::Arc;
-use ze_core::sparse_vec::SparseVec;
-use ze_gfx::backend::{RenderTargetView, Texture};
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct PhysicalResourceHandle(usize);
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ResourceHandle(pub(crate) usize);
 
-pub enum PhysicalResourceTextureView {
-    RTV(Arc<RenderTargetView>),
+pub(crate) struct Texture {
+    pub desc: FrameGraphTextureDesc,
+    pub resource: Option<Arc<ze_gfx::backend::Texture>>,
 }
 
-enum PhysicalResource {
-    Texture(Arc<Texture>, PhysicalResourceTextureView),
-    _Buffer(),
+pub(crate) enum ResourceData {
+    Texture(Texture),
+    Proxy(ResourceHandle),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Error {
-    UnknownResource,
-    InvalidResourceType,
+pub(crate) struct Resource {
+    pub name: String,
+    pub data: ResourceData,
+    pub external: bool,
+    pub last_pass_use: Option<usize>,
 }
 
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+#[derive(Default)]
+pub(crate) struct ResourceRegistry {
+    resources: Vec<Resource>,
+}
+
+impl ResourceRegistry {
+    pub fn create_texture(&mut self, name: &str, desc: FrameGraphTextureDesc) -> ResourceHandle {
+        assert!(
+            !self.resources.iter().any(|res| res.name == name),
+            "Resource already exists"
+        );
+        self.resources.push(Resource {
+            name: name.to_string(),
+            data: ResourceData::Texture(Texture {
+                desc,
+                resource: None,
+            }),
+            external: false,
+            last_pass_use: None,
+        });
+        ResourceHandle(self.resources.len() - 1)
     }
-}
 
-impl std::error::Error for Error {}
+    pub fn create_proxy(&mut self, handle: ResourceHandle) -> ResourceHandle {
+        self.resources.push(Resource {
+            name: String::default(),
+            data: ResourceData::Proxy(handle),
+            external: false,
+            last_pass_use: None,
+        });
+        ResourceHandle(self.resources.len() - 1)
+    }
 
-/// Registry containing physical resources used by a render graph
-pub struct PhysicalResourceRegistry {
-    resources: SparseVec<PhysicalResource>,
-    resource_name_map: HashMap<String, PhysicalResourceHandle>,
-}
+    pub fn resource(&self, handle: ResourceHandle) -> &Resource {
+        &self.resources[handle.0]
+    }
 
-impl PhysicalResourceRegistry {
-    pub fn new() -> Self {
-        Self {
-            resources: SparseVec::default(),
-            resource_name_map: Default::default(),
+    pub fn resource_mut(&mut self, handle: ResourceHandle) -> &mut Resource {
+        &mut self.resources[handle.0]
+    }
+
+    pub fn resolve_handle(&self, handle: ResourceHandle) -> ResourceHandle {
+        match self.resources[handle.0].data {
+            ResourceData::Proxy(proxy) => proxy,
+            _ => handle,
         }
     }
 
-    pub fn insert_or_update_existing_texture(
-        &mut self,
-        name: &str,
-        texture: Arc<Texture>,
-        view: PhysicalResourceTextureView,
-    ) -> PhysicalResourceHandle {
-        if let Some(resource_handle) = self.resource_name_map.get(name) {
-            let resource = &mut self.resources[resource_handle.0];
-            if let PhysicalResource::Texture(existing_texture, existing_view) = resource {
-                *existing_texture = texture;
-                *existing_view = view;
-                *resource_handle
-            } else {
-                panic!("Existing resource {} is not a texture!", name)
-            }
-        } else {
-            let index = self
-                .resources
-                .push(PhysicalResource::Texture(texture, view));
-            let handle = PhysicalResourceHandle(index);
-            self.resource_name_map.insert(name.to_string(), handle);
-            handle
-        }
-    }
-
-    pub fn remove_resource(&mut self, name: &str) -> Result<(), Error> {
-        if let Some(resource_handle) = self.resource_name_map.remove(name) {
-            self.resources.remove(resource_handle.0);
-            Ok(())
-        } else {
-            Err(Error::UnknownResource)
-        }
-    }
-
-    pub fn handle_from_name(&self, name: &str) -> Result<PhysicalResourceHandle, Error> {
-        if let Some(handle) = self.resource_name_map.get(name) {
-            Ok(*handle)
-        } else {
-            Err(Error::UnknownResource)
-        }
-    }
-
-    pub fn texture(&self, handle: PhysicalResourceHandle) -> Result<&Arc<Texture>, Error> {
+    pub fn texture(&self, handle: ResourceHandle) -> &Texture {
         let resource = &self.resources[handle.0];
-        if let PhysicalResource::Texture(texture, _) = resource {
-            return Ok(texture);
+        if let ResourceData::Texture(texture) = &resource.data {
+            texture
+        } else {
+            panic!("Resource is not a texture");
         }
-
-        Err(Error::InvalidResourceType)
     }
 
-    pub fn render_target_view(
-        &self,
-        handle: PhysicalResourceHandle,
-    ) -> Result<&Arc<RenderTargetView>, Error> {
+    pub fn texture_mut(&mut self, handle: ResourceHandle) -> &mut Texture {
+        let resource = &mut self.resources[handle.0];
+        if let ResourceData::Texture(texture) = &mut resource.data {
+            texture
+        } else {
+            panic!("Resource is not a texture");
+        }
+    }
+
+    pub fn is_texture(&self, handle: ResourceHandle) -> bool {
         let resource = &self.resources[handle.0];
-        if let PhysicalResource::Texture(_, PhysicalResourceTextureView::RTV(rtv)) = resource {
-            return Ok(rtv);
+        match resource.data {
+            ResourceData::Texture(_) => true,
+            _ => false,
         }
-
-        Err(Error::InvalidResourceType)
     }
 
-    pub fn get_or_create_texture(&mut self, name: &str, _: &TextureInfo) -> PhysicalResourceHandle {
-        if let Some(resource_handle) = self.resource_name_map.get(name) {
-            return *resource_handle;
-        }
+    pub fn is_external(&self, handle: ResourceHandle) -> bool {
+        let resource = &self.resources[handle.0];
+        resource.external
+    }
 
-        todo!()
+    pub fn resources(&self) -> &[Resource] {
+        &self.resources
     }
 }

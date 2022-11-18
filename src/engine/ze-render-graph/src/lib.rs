@@ -1,64 +1,298 @@
-use crate::registry::{PhysicalResourceHandle, PhysicalResourceRegistry};
+mod registry;
+pub mod render_pass;
+
+use registry::{ResourceData, ResourceHandle, ResourceRegistry};
+use render_pass::{
+    RenderPass, RenderPassBuilder, RenderPassExecutor, RenderPassType, TypedRenderPassExecutor,
+};
 use std::collections::HashMap;
-use std::ptr;
+use std::mem;
+use std::mem::MaybeUninit;
 use std::sync::Arc;
-use ze_core::color::Color4f32;
 use ze_gfx::backend::*;
 use ze_gfx::PixelFormat;
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct RenderPassHandle(usize);
-
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct ResourceHandle(usize);
-
-#[derive(PartialEq, Eq)]
-pub struct TextureInfo {
+#[derive(Clone)]
+pub struct FrameGraphTextureDesc {
     pub format: PixelFormat,
     pub width: u32,
     pub height: u32,
-    pub usage_flags: TextureUsageFlags,
 }
 
-impl Default for TextureInfo {
-    fn default() -> Self {
+pub struct FrameGraph<'a> {
+    device: Arc<dyn Device>,
+    resource_registry: ResourceRegistry,
+    passes: Vec<RenderPass<'a>>,
+}
+
+impl<'a> FrameGraph<'a> {
+    pub fn new(device: Arc<dyn Device>) -> Self {
         Self {
-            format: PixelFormat::Unknown,
-            width: 0,
-            height: 0,
-            usage_flags: TextureUsageFlags::empty(),
+            device,
+            resource_registry: ResourceRegistry::default(),
+            passes: vec![],
+        }
+    }
+
+    pub fn create_texture(&mut self, name: &str, desc: FrameGraphTextureDesc) -> ResourceHandle {
+        self.resource_registry.create_texture(name, desc)
+    }
+
+    pub fn create_proxy(&mut self, handle: ResourceHandle) -> ResourceHandle {
+        self.resource_registry.create_proxy(handle)
+    }
+
+    pub fn import_external_texture(&mut self, texture: Arc<Texture>, name: &str) -> ResourceHandle {
+        assert!(texture
+            .desc
+            .usage_flags
+            .contains(TextureUsageFlagBits::RenderTarget));
+
+        let desc = FrameGraphTextureDesc {
+            format: texture.desc.format,
+            width: texture.desc.width,
+            height: texture.desc.height,
+        };
+
+        let handle = self.resource_registry.create_texture(name, desc);
+        self.resource_registry.resource_mut(handle).external = true;
+        self.resource_registry.texture_mut(handle).resource = Some(texture);
+        handle
+    }
+
+    pub fn add_pass<T, S, E>(&mut self, name: &str, ty: RenderPassType, setup: S, exec: E)
+    where
+        T: 'static,
+        S: FnOnce(&mut RenderPassBuilder) -> T,
+        E: FnMut(&CompiledFrameGraph, &T, &mut CommandList) + 'a,
+    {
+        assert!(
+            !self.passes.iter().any(|pass| pass.name() == name),
+            "Pass already exists"
+        );
+
+        let render_pass = {
+            let mut builder = RenderPassBuilder::new(self);
+            let data = setup(&mut builder);
+
+            RenderPass {
+                name: name.to_string(),
+                ty,
+                executor: Box::new(TypedRenderPassExecutor {
+                    data,
+                    func: Box::new(exec),
+                }),
+                reads: builder.reads,
+                writes: builder.writes,
+                writes_clear_color: builder.writes_clear_color,
+                depth_stencil_input: builder.depth_stencil_input,
+                depth_stencil_output: builder.depth_stencil_output,
+                depth_stencil_clear_value: builder.depth_stencil_clear_value,
+            }
+        };
+        self.passes.push(render_pass);
+    }
+}
+
+/// Compiled [`FrameGraph`]
+pub struct CompiledFrameGraph<'a> {
+    device: Arc<dyn Device>,
+    resource_registry: ResourceRegistry,
+    passes: Vec<CompiledPass<'a>>,
+    textures: Vec<CompiledTexture>,
+    handle_to_compiled_texture: HashMap<ResourceHandle, usize>,
+    rtvs: HashMap<ResourceHandle, RenderTargetView>,
+    dsvs: HashMap<ResourceHandle, DepthStencilView>,
+}
+
+impl<'a> CompiledFrameGraph<'a> {
+    fn new(
+        device: Arc<dyn Device>,
+        resource_registry: ResourceRegistry,
+        passes: Vec<CompiledPass<'a>>,
+        textures: Vec<CompiledTexture>,
+    ) -> Self {
+        let handle_to_compiled_texture = textures
+            .iter()
+            .enumerate()
+            .map(|(i, h)| (h.handle, i))
+            .collect();
+
+        Self {
+            device,
+            resource_registry,
+            passes,
+            textures,
+            handle_to_compiled_texture,
+            rtvs: Default::default(),
+            dsvs: Default::default(),
+        }
+    }
+
+    pub fn execute(&mut self, cmd_list: &mut CommandList) {
+        let mut passes = mem::take(&mut self.passes);
+        for pass in &mut passes {
+            self.prepare_pass_resources(pass);
+
+            // Apply invalidate barriers
+            if !pass.invalidate_barriers.is_empty() {
+                let mut barriers = Vec::with_capacity(pass.invalidate_barriers.len());
+                for invalidate in &pass.invalidate_barriers {
+                    barriers.push(ResourceBarrier::Transition(ResourceTransitionBarrier {
+                        resource: ResourceTransitionBarrierResource::Texture(
+                            self.resource_registry
+                                .texture(invalidate.resource)
+                                .resource
+                                .as_ref()
+                                .unwrap(),
+                        ),
+                        source_state: invalidate.src_state,
+                        dest_state: invalidate.dst_state,
+                    }));
+                }
+
+                self.device.cmd_resource_barrier(cmd_list, &barriers);
+            }
+
+            let rtvs = pass
+                .render_targets
+                .iter()
+                .map(|rt| RenderPassRenderTarget {
+                    render_target_view: &self.rtvs[&rt.texture],
+                    load_mode: rt.load_mode,
+                    store_mode: rt.store_mode,
+                    clear_value: rt.clear_value,
+                })
+                .collect::<Vec<_>>();
+
+            let dsv = pass
+                .depth_stencil
+                .as_ref()
+                .map(|rt| RenderPassDepthStencil {
+                    depth_stencil_view: &self.dsvs[&rt.texture],
+                    load_mode: rt.load_mode,
+                    store_mode: rt.store_mode,
+                    clear_value: rt.clear_value,
+                });
+
+            let render_pass_desc = RenderPassDesc {
+                render_targets: &rtvs,
+                depth_stencil: dsv,
+            };
+
+            self.device
+                .cmd_begin_render_pass(cmd_list, &render_pass_desc);
+            pass.executor.execute(self, cmd_list);
+            self.device.cmd_end_render_pass(cmd_list);
+
+            // Apply flush barriers
+            if !pass.flush_barriers.is_empty() {
+                let mut barriers = Vec::with_capacity(pass.flush_barriers.len());
+                for flush in &pass.flush_barriers {
+                    barriers.push(ResourceBarrier::Transition(ResourceTransitionBarrier {
+                        resource: ResourceTransitionBarrierResource::Texture(
+                            self.resource_registry
+                                .texture(flush.resource)
+                                .resource
+                                .as_ref()
+                                .unwrap(),
+                        ),
+                        source_state: flush.src_state,
+                        dest_state: flush.dst_state,
+                    }));
+                }
+
+                self.device.cmd_resource_barrier(cmd_list, &barriers);
+            }
+        }
+        self.passes = passes;
+    }
+
+    pub fn texture(&mut self, handle: ResourceHandle) -> &Arc<Texture> {
+        let texture = self.resource_registry.texture(handle);
+        texture.resource.as_ref().unwrap()
+    }
+
+    fn prepare_pass_resources(&mut self, pass: &mut CompiledPass<'a>) {
+        for handle in pass
+            .render_targets
+            .iter()
+            .map(|rt| &rt.texture)
+            .chain(pass.depth_stencil.iter().map(|rt| &rt.texture))
+        {
+            let compiled_texture = &self.textures[self.handle_to_compiled_texture[handle]];
+            let resource = self.resource_registry.resource(*handle);
+            let texture = self.resource_registry.texture(*handle);
+            if texture.resource.is_none() {
+                let object = Arc::new(
+                    self.device
+                        .create_texture(
+                            &TextureDesc {
+                                width: compiled_texture.width,
+                                height: compiled_texture.height,
+                                depth: 1,
+                                mip_levels: 1,
+                                format: compiled_texture.format,
+                                sample_desc: Default::default(),
+                                usage_flags: compiled_texture.usage,
+                                memory_desc: MemoryDesc {
+                                    memory_location: MemoryLocation::GpuOnly,
+                                    memory_flags: Default::default(),
+                                },
+                            },
+                            Some(self.device.transient_memory_pool()),
+                            &resource.name,
+                        )
+                        .expect("Failed to create texture"),
+                );
+
+                let texture = self.resource_registry.texture_mut(*handle);
+                texture.resource = Some(object.clone());
+            }
+        }
+
+        for rt in &pass.render_targets {
+            #[allow(clippy::map_entry)]
+            if !self.rtvs.contains_key(&rt.texture) {
+                let texture = self.texture(rt.texture).clone();
+                let format = texture.desc.format;
+                let rtv = self
+                    .device
+                    .create_render_target_view(&RenderTargetViewDesc {
+                        resource: texture,
+                        format,
+                        ty: RenderTargetViewType::Texture2D(Texture2DRTV { mip_level: 0 }),
+                    })
+                    .unwrap();
+                self.rtvs.insert(rt.texture, rtv);
+            }
+        }
+
+        if let Some(ds) = &pass.depth_stencil {
+            #[allow(clippy::map_entry)]
+            if !self.dsvs.contains_key(&ds.texture) {
+                let texture = self.texture(ds.texture).clone();
+                let format = texture.desc.format;
+                let dsv = self
+                    .device
+                    .create_depth_stencil_view(&DepthStencilViewDesc {
+                        resource: texture,
+                        format,
+                        ty: DepthStencilViewType::Texture2D(Texture2DDSV { mip_level: 0 }),
+                    })
+                    .unwrap();
+                self.dsvs.insert(ds.texture, dsv);
+            }
         }
     }
 }
 
-#[derive(PartialEq, Eq)]
-enum ResourceData {
-    None,
-    Texture(TextureInfo),
-}
-
-struct Resource {
-    name: String,
-    handle: ResourceHandle,
-    physical_handle: Option<PhysicalResourceHandle>,
-    _pass_reads: Vec<RenderPassHandle>,
-    pass_writes: Vec<RenderPassHandle>,
-    data: ResourceData,
-}
-
-impl Resource {
-    fn new(name: &str, handle: ResourceHandle) -> Self {
-        Self {
-            name: name.to_string(),
-            handle,
-            physical_handle: None,
-            _pass_reads: vec![],
-            pass_writes: vec![],
-            data: ResourceData::None,
-        }
-    }
+// Compilation implementation
+struct CompiledPassRenderTarget {
+    pub texture: ResourceHandle,
+    pub load_mode: RenderPassTextureLoadMode,
+    pub store_mode: RenderPassTextureStoreMode,
+    pub clear_value: ClearValue,
 }
 
 struct Barrier {
@@ -67,233 +301,200 @@ struct Barrier {
     dst_state: ResourceState,
 }
 
-struct RenderPass<'a> {
-    name: String,
-    exec_fn: Box<dyn FnMut(&Arc<dyn Device>, &mut CommandList) + 'a>,
-    dependencies: Vec<RenderPassHandle>,
-    color_outputs: Vec<ResourceHandle>,
+struct CompiledPass<'a> {
     invalidate_barriers: Vec<Barrier>,
     flush_barriers: Vec<Barrier>,
+    render_targets: Vec<CompiledPassRenderTarget>,
+    depth_stencil: Option<CompiledPassRenderTarget>,
+    writes: Vec<ResourceHandle>,
+    executor: Box<dyn RenderPassExecutor<'a>>,
 }
 
-impl<'a> RenderPass<'a> {
-    fn new(name: &str, exec_fn: Box<dyn FnMut(&Arc<dyn Device>, &mut CommandList) + 'a>) -> Self {
-        Self {
-            name: name.to_string(),
-            exec_fn,
-            color_outputs: vec![],
-            dependencies: vec![],
-            invalidate_barriers: vec![],
-            flush_barriers: vec![],
-        }
-    }
+/// Data used while compiling a render graph
+struct CompiledTexture {
+    width: u32,
+    height: u32,
+    format: PixelFormat,
+    usage: TextureUsageFlags,
+    handle: ResourceHandle,
+    alias_with: Option<usize>,
 }
 
-pub struct RenderGraph<'a> {
-    device: Arc<dyn Device>,
-    registry: &'a mut PhysicalResourceRegistry,
-    resources: Vec<Resource>,
-    render_passes: Vec<RenderPass<'a>>,
-    resource_name_map: HashMap<String, ResourceHandle>,
-    backbuffer_resource: Option<ResourceHandle>,
-    final_pass_list: Vec<RenderPassHandle>,
+struct CompilationData<'a> {
+    backbuffer: ResourceHandle,
+    ordered_pass_list: Vec<usize>,
+    handle_to_compiled_texture_idx: HashMap<ResourceHandle, usize>,
+    textures: Vec<CompiledTexture>,
+    free_texture_pool: Vec<usize>,
+    compiled_passes: Vec<CompiledPass<'a>>,
 }
 
-impl<'a> RenderGraph<'a> {
-    pub fn new(device: Arc<dyn Device>, registry: &'a mut PhysicalResourceRegistry) -> Self {
-        Self {
-            device,
-            registry,
-            resources: vec![],
-            render_passes: vec![],
-            resource_name_map: Default::default(),
-            backbuffer_resource: None,
-            final_pass_list: vec![],
-        }
-    }
-
-    pub fn add_graphics_pass(
-        &mut self,
-        name: &str,
-        mut setup_fn: impl FnMut(&mut Self, RenderPassHandle),
-        exec_fn: impl FnMut(&Arc<dyn Device>, &mut CommandList) + 'a,
-    ) -> RenderPassHandle {
-        let exec_fn = Box::new(exec_fn);
-        self.render_passes.push(RenderPass::new(name, exec_fn));
-        let handle = RenderPassHandle(self.render_passes.len() - 1);
-        setup_fn(self, handle);
-        handle
-    }
-
-    fn get_or_create_resource(&mut self, name: &str) -> &mut Resource {
-        if let Some(resource) = self.resource_name_map.get(name) {
-            &mut self.resources[resource.0]
-        } else {
-            let handle = ResourceHandle(self.resources.len());
-            self.resources.push(Resource::new(name, handle));
-            self.resource_name_map.insert(name.to_string(), handle);
-            &mut self.resources[handle.0]
-        }
-    }
-
-    fn set_backbuffer(&mut self, name: &str) {
-        let rtv = self
-            .registry
-            .render_target_view(
-                self.registry
-                    .handle_from_name(name)
-                    .expect("Backbuffer not present in the registry!"),
-            )
-            .unwrap();
-
-        let info = TextureInfo {
-            format: rtv.desc.resource.desc.format,
-            width: rtv.desc.resource.desc.width,
-            height: rtv.desc.resource.desc.height,
-            usage_flags: rtv.desc.resource.desc.usage_flags,
+impl<'a> FrameGraph<'a> {
+    pub fn compile(mut self, backbuffer: ResourceHandle) -> CompiledFrameGraph<'a> {
+        let mut compilation_data = CompilationData {
+            backbuffer: self.resource_registry.resolve_handle(backbuffer),
+            ordered_pass_list: Vec::with_capacity(self.passes.len()),
+            handle_to_compiled_texture_idx: Default::default(),
+            textures: Default::default(),
+            free_texture_pool: vec![],
+            compiled_passes: vec![],
         };
 
-        let resource = self.get_or_create_resource(name);
-        debug_assert!(matches!(resource.data, ResourceData::Texture(_)));
+        // Acquire all passes writing directly to the backbuffer and add them to the final pass list
+        self.passes
+            .iter()
+            .enumerate()
+            .filter(|(_, pass)| pass.writes.iter().any(|output| output == &backbuffer))
+            .for_each(|(i, _)| {
+                compilation_data.ordered_pass_list.push(i);
+            });
 
-        resource.data = ResourceData::Texture(info);
-
-        self.backbuffer_resource = Some(resource.handle);
-    }
-
-    pub fn compile(&mut self, backbuffer_name: &str) {
-        self.set_backbuffer(backbuffer_name);
-        assert!(self.backbuffer_resource.is_some());
-
-        // The final ordered pass list
-        let mut pass_list = vec![];
-
-        let backbuffer_resource = self.backbuffer_resource.as_ref().unwrap();
-        let backbuffer = &self.resources[backbuffer_resource.0];
-
-        // List all render passes that directly write to the back buffer
-        for pass in &backbuffer.pass_writes {
-            pass_list.push(*pass);
-        }
-
-        // Traverse each pass dependencies to get a unordered list of all referenced render passes
+        // Now traverse all passes that writes to resources needed by the passes writing to the backbuffer
+        // This will cull unused passes
         {
-            let pass_list_copy = pass_list.clone();
-            for pass in pass_list_copy {
-                self.traverse_pass_dependencies(&mut pass_list, pass, 0);
+            let mut pass_queue = compilation_data.ordered_pass_list.clone();
+            while let Some(pass) = pass_queue.pop() {
+                let pass = &self.passes[pass];
+                for &input in &pass.reads {
+                    for (i, pass) in self.passes.iter().enumerate() {
+                        if pass.writes.iter().any(|&output| output == input)
+                            && !compilation_data.ordered_pass_list.contains(&i)
+                        {
+                            compilation_data.ordered_pass_list.push(i);
+                            pass_queue.push(i);
+                        }
+                    }
+                }
             }
         }
 
-        pass_list.reverse();
-        pass_list.dedup();
-        self.order_passes(&mut pass_list);
-        self.final_pass_list = pass_list;
-        self.build_physical_resources();
-        self.build_barriers();
+        compilation_data.ordered_pass_list.dedup();
+        compilation_data.ordered_pass_list.reverse();
+
+        // Ordered pass list is now in the correct order
+        self.build_physical_textures(&mut compilation_data);
+        self.build_physical_passes(&mut compilation_data);
+        self.build_barriers(&mut compilation_data);
+
+        CompiledFrameGraph::new(
+            self.device,
+            self.resource_registry,
+            compilation_data.compiled_passes,
+            compilation_data.textures,
+        )
     }
 
-    pub fn execute(mut self, command_list: &mut CommandList) {
-        self.device.cmd_debug_begin_event(
-            command_list,
-            "Render Graph",
-            Color4f32::new(0.75, 0.3, 0.15, 1.0),
-        );
+    fn build_physical_textures(&mut self, compilation_data: &mut CompilationData) {
+        let ordered_pass_list = compilation_data.ordered_pass_list.clone();
+        for pass_idx in ordered_pass_list {
+            // Set textures last use
+            let pass = &self.passes[pass_idx];
+            for &texture in pass.iter_resources() {
+                if !self.resource_registry.is_texture(texture) {
+                    continue;
+                }
 
-        for handle in &self.final_pass_list {
-            let render_pass = &mut self.render_passes[handle.0];
+                self.resource_registry.resource_mut(texture).last_pass_use = Some(pass_idx);
+            }
 
-            self.device.cmd_debug_begin_event(
-                command_list,
-                &render_pass.name,
-                Color4f32::new(0.3, 0.75, 0.15, 1.0),
-            );
+            // Collect texture usages
+            for &read in &pass.reads {
+                let texture = self.add_physical_texture(compilation_data, read);
+                texture.usage |= TextureUsageFlagBits::Sampled;
+            }
 
-            let mut render_targets = Vec::with_capacity(render_pass.color_outputs.len());
-            for output in &render_pass.color_outputs {
-                let resource = &self.resources[output.0];
-                let physical_resource = resource.physical_handle.unwrap();
-                let rtv = self.registry.render_target_view(physical_resource).unwrap();
-                render_targets.push(RenderPassTexture {
-                    render_target_view: rtv,
+            for &write in &pass.writes {
+                let texture = self.add_physical_texture(compilation_data, write);
+                texture.usage |= TextureUsageFlagBits::RenderTarget;
+            }
+
+            if let Some(depth_stencil_input) = pass.depth_stencil_input {
+                let texture = self.add_physical_texture(compilation_data, depth_stencil_input);
+                texture.usage |= TextureUsageFlagBits::DepthStencil;
+            } else if let Some(depth_stencil_output) = pass.depth_stencil_output {
+                let texture = self.add_physical_texture(compilation_data, depth_stencil_output);
+                texture.usage |= TextureUsageFlagBits::DepthStencil;
+            }
+
+            // If at this pass, any textures are not anymore used, we can push them to the free texture pool
+            for &texture in pass.iter_resources() {
+                let texture = self.resource_registry.resolve_handle(texture);
+
+                if self.resource_registry.is_texture(texture)
+                    && self.resource_registry.resource(texture).last_pass_use == Some(pass_idx)
+                {
+                    compilation_data
+                        .free_texture_pool
+                        .push(compilation_data.handle_to_compiled_texture_idx[&texture]);
+                }
+            }
+        }
+    }
+
+    fn build_physical_passes(&mut self, compilation_data: &mut CompilationData<'a>) {
+        let ordered_pass_list = compilation_data.ordered_pass_list.clone();
+        let mut passes = mem::take(&mut self.passes)
+            .into_iter()
+            .map(MaybeUninit::new)
+            .collect::<Vec<_>>();
+
+        for pass_idx in ordered_pass_list {
+            let pass =
+                unsafe { mem::replace(&mut passes[pass_idx], MaybeUninit::uninit()).assume_init() };
+            let mut render_targets = Vec::with_capacity(MAX_RENDER_PASS_RENDER_TARGET_COUNT);
+            let mut depth_stencil = None;
+            for (i, &output) in pass.writes.iter().enumerate() {
+                let output = self.resource_registry.resolve_handle(output);
+                if self.resource_registry.is_texture(output) {
+                    let clear_value = &pass.writes_clear_color[i];
+                    let load_mode = {
+                        if pass.reads.contains(&output) {
+                            RenderPassTextureLoadMode::Preserve
+                        } else if clear_value.is_some() {
+                            RenderPassTextureLoadMode::Clear
+                        } else {
+                            RenderPassTextureLoadMode::Discard
+                        }
+                    };
+                    render_targets.push(CompiledPassRenderTarget {
+                        texture: output,
+                        load_mode,
+                        store_mode: RenderPassTextureStoreMode::Preserve,
+                        clear_value: clear_value.unwrap_or(ClearValue::Color([0.0, 0.0, 0.0, 0.0])),
+                    });
+                }
+            }
+
+            if let Some(depth_stencil_input) = pass.depth_stencil_input {
+                let clear_value = pass.depth_stencil_clear_value.unwrap();
+                depth_stencil = Some(CompiledPassRenderTarget {
+                    texture: depth_stencil_input,
+                    load_mode: RenderPassTextureLoadMode::Preserve,
+                    store_mode: RenderPassTextureStoreMode::Preserve,
+                    clear_value,
+                });
+            } else if let Some(depth_stencil_output) = pass.depth_stencil_output {
+                let clear_value = pass.depth_stencil_clear_value.unwrap();
+                depth_stencil = Some(CompiledPassRenderTarget {
+                    texture: depth_stencil_output,
                     load_mode: RenderPassTextureLoadMode::Clear,
                     store_mode: RenderPassTextureStoreMode::Preserve,
-                    clear_value: ClearValue::Color([0.0, 0.0, 0.0, 1.0]),
+                    clear_value,
                 });
             }
 
-            // Apply invalidate barriers
-            if !render_pass.invalidate_barriers.is_empty() {
-                let mut barriers = Vec::with_capacity(render_pass.invalidate_barriers.len());
-                for invalidate in &render_pass.invalidate_barriers {
-                    let resource = &self.resources[invalidate.resource.0];
-                    barriers.push(ResourceBarrier::Transition(ResourceTransitionBarrier {
-                        resource: ResourceTransitionBarrierResource::Texture(
-                            self.registry
-                                .texture(resource.physical_handle.unwrap())
-                                .unwrap(),
-                        ),
-                        source_state: invalidate.src_state,
-                        dest_state: invalidate.dst_state,
-                    }));
-                }
-
-                self.device.cmd_resource_barrier(command_list, &barriers);
-            }
-
-            self.device.cmd_begin_render_pass(
-                command_list,
-                &RenderPassDesc {
-                    render_targets: &render_targets,
-                    depth_stencil: None,
-                },
-            );
-            (render_pass.exec_fn)(&self.device, command_list);
-
-            self.device.cmd_end_render_pass(command_list);
-
-            if !render_pass.flush_barriers.is_empty() {
-                let mut barriers = Vec::with_capacity(render_pass.flush_barriers.len());
-                for flush in &render_pass.flush_barriers {
-                    let resource = &self.resources[flush.resource.0];
-                    barriers.push(ResourceBarrier::Transition(ResourceTransitionBarrier {
-                        resource: ResourceTransitionBarrierResource::Texture(
-                            self.registry
-                                .texture(resource.physical_handle.unwrap())
-                                .unwrap(),
-                        ),
-                        source_state: flush.src_state,
-                        dest_state: flush.dst_state,
-                    }));
-                }
-
-                self.device.cmd_resource_barrier(command_list, &barriers);
-            }
-
-            self.device.cmd_debug_end_event(command_list);
-        }
-
-        self.device.cmd_debug_end_event(command_list);
-    }
-
-    fn build_physical_resources(&mut self) {
-        for pass_handle in &self.final_pass_list {
-            let pass = &self.render_passes[pass_handle.0];
-            for output_handle in &pass.color_outputs {
-                let mut resource = &mut self.resources[output_handle.0];
-                if let ResourceData::Texture(info) = &resource.data {
-                    resource.physical_handle =
-                        Some(self.registry.get_or_create_texture(&resource.name, info))
-                } else {
-                    panic!(
-                        "Resource {} must be a texture to be used as a color output for a pass!",
-                        resource.name
-                    );
-                }
-            }
+            compilation_data.compiled_passes.push(CompiledPass {
+                invalidate_barriers: vec![],
+                flush_barriers: vec![],
+                render_targets,
+                depth_stencil,
+                writes: pass.writes,
+                executor: pass.executor,
+            });
         }
     }
 
-    fn build_barriers(&mut self) {
+    fn build_barriers(&self, compilation_data: &mut CompilationData) {
         // The algorithm is quite simple:
         // - We traverse each render pass, making a barrier depending on the requested resource state and the current resource state
         //
@@ -301,147 +502,96 @@ impl<'a> RenderGraph<'a> {
         // - Backbuffer initial state is considered Present
         // - Backbuffer final state will be Present
 
-        let mut resource_states = Vec::with_capacity(self.resources.len());
-        for i in 0..self.resources.len() {
-            resource_states.push(if i == self.backbuffer_resource.unwrap().0 {
+        let mut resource_states = Vec::with_capacity(self.resource_registry.resources().len());
+        for i in 0..self.resource_registry.resources().len() {
+            resource_states.push(if i == compilation_data.backbuffer.0 {
                 ResourceState::Present
             } else {
                 ResourceState::Common
             });
         }
 
-        for pass_handle in &self.final_pass_list {
-            let pass = &mut self.render_passes[pass_handle.0];
+        for compiled_pass in &mut compilation_data.compiled_passes {
+            for &color_output in &compiled_pass.writes {
+                let color_output = self.resource_registry.resolve_handle(color_output);
+                let src_state = resource_states[color_output.0];
+                if src_state != ResourceState::RenderTargetWrite {
+                    compiled_pass.invalidate_barriers.push(Barrier {
+                        resource: color_output,
+                        src_state,
+                        dst_state: ResourceState::RenderTargetWrite,
+                    });
 
-            for color_output in &pass.color_outputs {
-                pass.invalidate_barriers.push(Barrier {
-                    resource: *color_output,
-                    src_state: resource_states[color_output.0],
-                    dst_state: ResourceState::RenderTargetWrite,
-                });
-
-                resource_states[color_output.0] = ResourceState::RenderTargetWrite;
+                    resource_states[color_output.0] = ResourceState::RenderTargetWrite;
+                }
             }
         }
 
-        let backbuffer = self.backbuffer_resource.unwrap();
-        self.render_passes[self.final_pass_list.last().unwrap().0]
+        let last_idx = compilation_data.compiled_passes.len() - 1;
+        compilation_data.compiled_passes[last_idx]
             .flush_barriers
             .push(Barrier {
-                resource: self.backbuffer_resource.unwrap(),
-                src_state: resource_states[backbuffer.0],
+                resource: compilation_data.backbuffer,
+                src_state: resource_states[compilation_data.backbuffer.0],
                 dst_state: ResourceState::Present,
             });
     }
 
-    fn order_passes(&self, pass_list: &mut Vec<RenderPassHandle>) {
-        let schedule = |index: usize,
-                        passes: &mut Vec<RenderPassHandle>,
-                        final_pass_list: &mut Vec<RenderPassHandle>| {
-            final_pass_list.push(passes[index]);
-            passes.copy_within(index + 1.., index);
-            passes.pop();
-        };
+    fn add_physical_texture<'b>(
+        &self,
+        compilation_data: &'b mut CompilationData,
+        handle: ResourceHandle,
+    ) -> &'b mut CompiledTexture {
+        if let ResourceData::Proxy(texture) = &self.resource_registry.resource(handle).data {
+            self.add_physical_texture(compilation_data, *texture)
+        } else {
+            let texture = self.resource_registry.texture(handle);
 
-        let mut final_pass_list = Vec::with_capacity(pass_list.len());
-        schedule(0, pass_list, &mut final_pass_list);
+            // Fetch the free pool to find a texture that can be reused
+            let reusable_texture = {
+                if !self.resource_registry.is_external(handle) {
+                    let reusable_texture_idx =
+                        compilation_data
+                            .free_texture_pool
+                            .iter()
+                            .position(|&free_texture_idx| {
+                                let free_texture = &compilation_data.textures[free_texture_idx];
+                                let can_contain_texture = free_texture
+                                    .format
+                                    .texture_size_in_bytes(free_texture.width, free_texture.height)
+                                    >= texture.desc.format.texture_size_in_bytes(
+                                        texture.desc.width,
+                                        texture.desc.height,
+                                    );
 
-        while !pass_list.is_empty() {
-            let mut pass_to_schedule = 0;
-            for (i, _) in pass_list.iter().enumerate() {
-                let mut candidate = true;
-                for j in 0..i {
-                    if self.depends_on_pass(&self.render_passes[i], &self.render_passes[j]) {
-                        candidate = true;
-                        break;
-                    }
+                                can_contain_texture
+                                    && !self.resource_registry.is_external(free_texture.handle)
+                            });
+
+                    reusable_texture_idx.map(|idx| compilation_data.free_texture_pool.remove(idx))
+                } else {
+                    None
                 }
+            };
 
-                if !candidate {
-                    continue;
-                }
+            assert!(reusable_texture.is_none(), "aliasing not implemented yet");
 
-                pass_to_schedule = i;
-            }
+            let idx = compilation_data
+                .handle_to_compiled_texture_idx
+                .entry(handle)
+                .or_insert_with(|| {
+                    compilation_data.textures.push(CompiledTexture {
+                        width: texture.desc.width,
+                        height: texture.desc.height,
+                        format: texture.desc.format,
+                        usage: TextureUsageFlags::empty(),
+                        handle,
+                        alias_with: reusable_texture,
+                    });
+                    compilation_data.textures.len() - 1
+                });
 
-            schedule(pass_to_schedule, pass_list, &mut final_pass_list);
-        }
-
-        *pass_list = final_pass_list;
-    }
-
-    fn depends_on_pass(&self, a: &RenderPass, b: &RenderPass) -> bool {
-        if ptr::eq(a as *const _, b as *const _) {
-            return true;
-        }
-
-        for dependency in &a.dependencies {
-            if self.depends_on_pass(&self.render_passes[dependency.0], b) {
-                return true;
-            }
-        }
-
-        false
-    }
-
-    fn traverse_pass_dependencies(
-        &mut self,
-        pass_list: &mut Vec<RenderPassHandle>,
-        pass: RenderPassHandle,
-        stack_depth: usize,
-    ) {
-        let _ = &self.render_passes[pass.0];
-
-        // Collect pass dependencies and add them later on
-        let pass_dependencies = vec![];
-
-        // TODO: Collect attachment inputs & color inputs
-        // See https://github.com/Zino2201/Prism/blob/main/src/engine/prism_gfx/src/render_graph.rs
-
-        self.add_pass_recursive(pass_list, pass, &pass_dependencies, stack_depth);
-    }
-
-    fn add_pass_recursive(
-        &mut self,
-        pass_list: &mut Vec<RenderPassHandle>,
-        pass: RenderPassHandle,
-        written_passes: &Vec<RenderPassHandle>,
-        stack_depth: usize,
-    ) {
-        assert!(stack_depth < self.render_passes.len());
-
-        for write_pass in written_passes {
-            if *write_pass != pass {
-                self.render_passes[pass.0].dependencies.push(*write_pass);
-                pass_list.push(*write_pass);
-                self.traverse_pass_dependencies(pass_list, *write_pass, stack_depth + 1);
-            }
+            &mut compilation_data.textures[*idx]
         }
     }
 }
-
-// Render pass manipulation functions
-impl<'a> RenderGraph<'a> {
-    pub fn add_pass_color_output(
-        &mut self,
-        render_pass_handle: RenderPassHandle,
-        name: &str,
-        info: TextureInfo,
-    ) -> ResourceHandle {
-        let resource = self.get_or_create_resource(name);
-        match &mut resource.data {
-            ResourceData::None => resource.data = ResourceData::Texture(info),
-            ResourceData::Texture(info) => {
-                info.usage_flags.insert(TextureUsageFlagBits::RenderTarget);
-            }
-        }
-        resource.pass_writes.push(render_pass_handle);
-
-        let handle = resource.handle;
-        let render_pass = &mut self.render_passes[render_pass_handle.0];
-        render_pass.color_outputs.push(handle);
-        handle
-    }
-}
-
-pub mod registry;

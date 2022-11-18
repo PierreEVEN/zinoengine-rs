@@ -8,12 +8,19 @@ use ze_reflection::*;
 #[non_exhaustive]
 pub enum PixelFormat {
     Unknown,
+
+    // BGRA formats
     B8G8R8A8UnormSrgb,
     B8G8R8A8Unorm,
 
+    // R formats
     R8Unorm,
 
+    // RGBA formats
     R8G8B8A8Unorm,
+
+    // Depth/stencil formats
+    D24UnormS8Uint,
 }
 
 impl PixelFormat {
@@ -25,6 +32,9 @@ impl PixelFormat {
             | PixelFormat::R8G8B8A8Unorm => 4,
 
             PixelFormat::R8Unorm => 1,
+
+            // Depth/stencil formats
+            PixelFormat::D24UnormS8Uint => 4,
         }
     }
 
@@ -70,7 +80,9 @@ pub enum ShaderStageFlagBits {
     Vertex = 1 << 0,
     Fragment = 1 << 1,
     Compute = 1 << 2,
+    Mesh = 1 << 3,
 }
 
 pub mod backend;
+pub mod null;
 pub mod utils;

@@ -1,10 +1,11 @@
 ﻿use crate::access::Access;
 use crate::archetype::{Archetype, ArchetypeId};
+use crate::entity::Entity;
 use crate::system::param::{SystemParamFetch, SystemParamState};
 use crate::system::query::SystemQuery;
 use crate::world::query::Query;
 use crate::world::World;
-use std::cell::SyncUnsafeCell;
+use ze_core::sync::SyncUnsafeCell;
 use ze_jobsystem::prelude::*;
 
 pub struct QueryState<Q: Query> {
@@ -32,7 +33,7 @@ impl<'world, Q: Query> QueryState<Q> {
         let mut fetch = Q::initialize_fetch(world, &self.state);
         for archetype_id in &self.archetypes {
             let archetype = world.archetype_registry.get(*archetype_id);
-            Q::set_archetype(&mut fetch, &self.state, archetype);
+            Q::prepare_fetch(&mut fetch, &self.state, archetype);
             for entity in archetype.entities() {
                 // SAFETY: set_archetype is called before fetch
                 let item = unsafe { Q::fetch(&fetch, entity.id() as usize) };
@@ -54,7 +55,7 @@ impl<'world, Q: Query> QueryState<Q> {
         for archetype_id in &self.archetypes {
             let fetch = unsafe { &mut *fetch.get() };
             let archetype = world.archetype_registry.get(*archetype_id);
-            Q::set_archetype(fetch, &self.state, archetype);
+            Q::prepare_fetch(fetch, &self.state, archetype);
             archetype.entities().par_iter().for_each(|entity| {
                 // SAFETY: set_archetype is called before fetch
                 let item = unsafe { Q::fetch(fetch, entity.id() as usize) };
@@ -64,6 +65,23 @@ impl<'world, Q: Query> QueryState<Q> {
                 func(item);
             });
         }
+    }
+
+    /// Get query result for a specific entity
+    #[inline]
+    pub fn get(&mut self, world: &'world World, entity: Entity) -> Option<Q::Item<'world>> {
+        self.collect_archetypes(world);
+
+        let archetype_id = world.entity_registry.archetype_id(entity).0;
+        if !self.archetypes.contains(&archetype_id) {
+            return None;
+        }
+
+        let archetype = world.archetype_registry.get(archetype_id);
+        let mut fetch = Q::initialize_fetch(world, &self.state);
+        Q::prepare_fetch(&mut fetch, &self.state, archetype);
+        let item = unsafe { Q::fetch(&fetch, entity.id() as usize) };
+        Some(item)
     }
 
     fn collect_archetypes(&mut self, world: &'world World) {

@@ -2,3 +2,9 @@
 	path = src/engine/ze-imgui-sys/third-party/cimgui
 	url = https://github.com/cimgui/cimgui.git
 	branch = docking_inter
+[submodule "src/third-party/ze-meshoptimizer-sys/third-party/meshoptimizer"]
+	path = src/third-party/ze-meshoptimizer-sys/third-party/meshoptimizer
+	url = https://github.com/zeux/meshoptimizer.git
+[submodule "src/third-party/ze-d3dmemoryallocator-sys/third-party/D3D12MemoryAllocator"]
+	path = src/third-party/ze-d3dmemoryallocator-sys/third-party/D3D12MemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator.git

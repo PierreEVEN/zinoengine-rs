@@ -6,3 +6,9 @@ members = ["src/editor/*",
     "src/third-party/*"]
 exclude = ["src/engine/macos", "src/engine/windows", 
     "src/engine/ze-ui"]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

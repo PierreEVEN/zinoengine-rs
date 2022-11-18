@@ -1,27 +1,24 @@
 ﻿use crate::command_manager::CommandManager;
-use crate::device::{D3D12Device, SendableAllocator};
-use parking_lot::Mutex;
+use crate::device::D3D12Device;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use windows::Win32::Graphics::Direct3D12::{ID3D12CommandQueue, ID3D12Device};
+use windows::Win32::Graphics::Direct3D12::{ID3D12CommandQueue, ID3D12Device2};
 
-use crate::resource_manager::ResourceManager;
+use crate::resource_manager::DeferredResourceQueue;
 
-pub struct Frame {
-    resource_manager: ResourceManager,
+pub(crate) struct Frame {
+    resource_manager: DeferredResourceQueue,
     command_manager: CommandManager,
 }
 
 impl Frame {
     pub fn new(
-        allocator: Arc<Mutex<SendableAllocator>>,
-        device: &ID3D12Device,
+        device: &ID3D12Device2,
         graphics_queue: &ID3D12CommandQueue,
         compute_queue: &ID3D12CommandQueue,
         transfer_queue: &ID3D12CommandQueue,
     ) -> Self {
         Self {
-            resource_manager: ResourceManager::new(allocator),
+            resource_manager: DeferredResourceQueue::default(),
             command_manager: CommandManager::new(
                 device,
                 graphics_queue,
@@ -36,7 +33,7 @@ impl Frame {
         self.command_manager.wait_for_work();
     }
 
-    pub fn resource_manager(&self) -> &ResourceManager {
+    pub fn resource_manager(&self) -> &DeferredResourceQueue {
         &self.resource_manager
     }
 
@@ -46,7 +43,7 @@ impl Frame {
 }
 
 /// Manage multiple frames that may be processed concurrently without concerns
-pub struct FrameManager {
+pub(crate) struct FrameManager {
     frames: Vec<Frame>,
     frame_count: usize,
     current_frame: AtomicUsize,
@@ -55,8 +52,7 @@ pub struct FrameManager {
 impl FrameManager {
     pub fn new(
         frame_count: usize,
-        allocator: &Arc<Mutex<SendableAllocator>>,
-        device: &ID3D12Device,
+        device: &ID3D12Device2,
         graphics_queue: &ID3D12CommandQueue,
         compute_queue: &ID3D12CommandQueue,
         transfer_queue: &ID3D12CommandQueue,
@@ -64,7 +60,6 @@ impl FrameManager {
         let mut frames = vec![];
         for _ in 0..frame_count {
             frames.push(Frame::new(
-                allocator.clone(),
                 device,
                 graphics_queue,
                 compute_queue,
@@ -88,7 +83,7 @@ impl FrameManager {
 
         self.current_frame().command_manager().new_frame();
 
-        self.current_frame().resource_manager().destroy_resources();
+        self.current_frame().resource_manager().flush();
     }
 
     pub fn wait_for_work(&self) {

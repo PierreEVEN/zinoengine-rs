@@ -27,11 +27,13 @@ pub(crate) struct EntityRegistry {
     datas: Vec<EntityData>,
     available_ids: Vec<u32>,
     free_id: u32,
+    entity_count: u32,
 }
 
 impl EntityRegistry {
     pub fn alloc(&mut self) -> Entity {
         if let Some(id) = self.available_ids.pop() {
+            self.entity_count += 1;
             Entity {
                 generation: self.datas[id as usize].generation,
                 id,
@@ -40,6 +42,7 @@ impl EntityRegistry {
             self.datas.push(EntityData::default());
             let id = self.free_id;
             self.free_id += 1;
+            self.entity_count += 1;
             Entity { generation: 0, id }
         }
     }
@@ -48,6 +51,7 @@ impl EntityRegistry {
         let data = &mut self.datas[entity.id as usize];
         data.generation += 1;
         data.archetype = None;
+        self.entity_count -= 1;
         self.available_ids.push(entity.id);
     }
 
@@ -64,6 +68,18 @@ impl EntityRegistry {
         self.datas[entity.id as usize]
             .archetype
             .expect("Entity must have an archetype")
+    }
+
+    /// Get an entity handle from its id
+    pub fn entity(&self, id: u32) -> Entity {
+        Entity {
+            generation: self.datas[id as usize].generation,
+            id,
+        }
+    }
+
+    pub fn count(&self) -> u32 {
+        self.entity_count
     }
 }
 

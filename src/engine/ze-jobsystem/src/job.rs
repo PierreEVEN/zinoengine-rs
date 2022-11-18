@@ -70,8 +70,11 @@ impl Default for Job {
 
 #[inline]
 pub(crate) fn execute(job: JobHandle, shared_worker_data: &SharedWorkerData) {
-    let func = unsafe { job.function.assume_init() };
-    func(job);
+    {
+        let func = unsafe { job.function.assume_init() };
+        func(job);
+    }
+
     finish(job, shared_worker_data);
 }
 

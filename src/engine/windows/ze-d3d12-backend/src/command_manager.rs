@@ -1,4 +1,5 @@
-﻿use crate::device::{D3D12CommandList, D3D12Device};
+﻿use crate::device::cmd_list::D3D12CommandList;
+use crate::device::D3D12Device;
 use crate::utils;
 use crate::utils::SendableIUnknown;
 use std::cell::RefCell;
@@ -9,22 +10,17 @@ use std::thread;
 use thread_local::ThreadLocal;
 use tinyvec::TinyVec;
 use windows::core::Interface;
-use windows::Win32::Graphics::Direct3D12::{
-    ID3D12CommandAllocator, ID3D12CommandList, ID3D12CommandQueue, ID3D12Device, ID3D12Fence,
-    ID3D12GraphicsCommandList, ID3D12GraphicsCommandList4, D3D12_COMMAND_LIST_TYPE,
-    D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_LIST_TYPE_COPY, D3D12_COMMAND_LIST_TYPE_DIRECT,
-    D3D12_FENCE_FLAG_NONE,
-};
+use windows::Win32::Graphics::Direct3D12::*;
 use ze_core::pool::{Handle, Pool};
 use ze_gfx::backend;
 use ze_gfx::backend::{Fence, QueueType};
 
 pub struct CommandList {
-    pub command_list: SendableIUnknown<ID3D12GraphicsCommandList4>,
+    pub command_list: SendableIUnknown<ID3D12GraphicsCommandList6>,
 }
 
 impl CommandList {
-    pub fn new(command_list: SendableIUnknown<ID3D12GraphicsCommandList4>) -> Self {
+    pub fn new(command_list: SendableIUnknown<ID3D12GraphicsCommandList6>) -> Self {
         Self { command_list }
     }
 }
@@ -52,7 +48,7 @@ impl CommandAllocator {
         list_type: D3D12_COMMAND_LIST_TYPE,
     ) -> (
         Handle<CommandList>,
-        SendableIUnknown<ID3D12GraphicsCommandList4>,
+        SendableIUnknown<ID3D12GraphicsCommandList6>,
     ) {
         if let Some(list) = self.free_lists.pop_front() {
             let command_list = &mut self.list_pool[&list];
@@ -69,12 +65,12 @@ impl CommandAllocator {
                 device.device().CreateCommandList(
                     0,
                     list_type,
-                    self.allocator.deref().clone(),
+                    &self.allocator.deref().clone(),
                     None,
                 )
             };
 
-            let list = list.unwrap().cast::<ID3D12GraphicsCommandList4>().unwrap();
+            let list = list.unwrap().cast::<ID3D12GraphicsCommandList6>().unwrap();
 
             let handle = self.list_pool.insert(CommandList::new(list.clone().into()));
             self.allocated_lists.push_back(handle);
@@ -203,13 +199,13 @@ impl CommandQueue {
 /// Manage command queues, allocators and lists
 /// When a command list is allocated, it'll be recycled on the next frame
 /// There is a set of alloctors per thread and one allocator per command list type
-pub struct CommandManager {
+pub(crate) struct CommandManager {
     queues: HashMap<QueueType, CommandQueue>,
 }
 
 impl CommandManager {
     pub fn new(
-        device: &ID3D12Device,
+        device: &ID3D12Device2,
         graphics_queue: &ID3D12CommandQueue,
         compute_queue: &ID3D12CommandQueue,
         transfer_queue: &ID3D12CommandQueue,
@@ -265,7 +261,7 @@ impl CommandManager {
         queue_type: QueueType,
     ) -> (
         Handle<CommandList>,
-        SendableIUnknown<ID3D12GraphicsCommandList4>,
+        SendableIUnknown<ID3D12GraphicsCommandList6>,
     ) {
         if let Some(queue) = self.queues.get(&queue_type) {
             debug_assert_eq!(queue.ty, queue_type);

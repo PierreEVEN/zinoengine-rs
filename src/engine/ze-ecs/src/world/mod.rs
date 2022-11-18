@@ -10,7 +10,7 @@ use crate::world::query::state::QueryState;
 use crate::world::query::Query;
 use std::cell::Cell;
 use std::mem::forget;
-use std::ptr::Unique;
+use std::ptr::NonNull;
 
 /// Id of the empty archetype
 pub const EMPTY_ARCHETYPE_ID: ArchetypeId = 0;
@@ -81,7 +81,7 @@ impl World {
             self.add_component(
                 entity,
                 T::component_id(),
-                Unique::new_unchecked(&mut component as *mut T as *mut u8),
+                NonNull::new_unchecked(&mut component as *mut T as *mut u8),
             );
         }
 
@@ -100,7 +100,7 @@ impl World {
         &mut self,
         entity: Entity,
         component: ComponentId,
-        value: Unique<u8>,
+        value: NonNull<u8>,
     ) {
         #[cfg(feature = "profiling")]
         puffin::profile_function!();
@@ -226,13 +226,22 @@ impl World {
         self.entity_registry.is_valid(entity)
     }
 
+    /// Get an entity handle from its id
+    pub fn entity(&self, id: u32) -> Entity {
+        self.entity_registry.entity(id)
+    }
+
+    pub fn entity_count(&self) -> u32 {
+        self.entity_registry.count()
+    }
+
     fn move_entity_to_archetype(
         &mut self,
         entity: Entity,
         src: &ArchetypeId,
         dst: &ArchetypeId,
         components_to_drop: &[ComponentId],
-        mut new_values: Vec<(ComponentId, Unique<u8>)>,
+        mut new_values: Vec<(ComponentId, NonNull<u8>)>,
     ) {
         #[cfg(feature = "profiling")]
         puffin::profile_function!();
@@ -251,7 +260,7 @@ impl World {
             .map(|component_id| unsafe {
                 (
                     *component_id,
-                    Unique::new_unchecked(
+                    NonNull::new_unchecked(
                         src_archetype
                             .columns_mut()
                             .get_mut(*component_id)
@@ -413,6 +422,7 @@ mod tests {
     }
 }
 
+/*
 #[cfg(test)]
 mod benches {
     use crate::component::{Component, ComponentId};
@@ -537,3 +547,4 @@ mod benches {
         });
     }
 }
+*/

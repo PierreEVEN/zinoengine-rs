@@ -24,35 +24,43 @@ pub enum DeviceError {
     InvalidParameters,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum RenderPassTextureLoadMode {
     Discard,
     Preserve,
     Clear,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum RenderPassTextureStoreMode {
     Discard,
     Preserve,
     Resolve,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ClearValue {
     Color([f32; 4]),
     DepthStencil((f32, u8)),
 }
 
-pub struct RenderPassTexture<'a> {
+pub struct RenderPassRenderTarget<'a> {
     pub render_target_view: &'a RenderTargetView,
     pub load_mode: RenderPassTextureLoadMode,
     pub store_mode: RenderPassTextureStoreMode,
     pub clear_value: ClearValue,
 }
 
+pub struct RenderPassDepthStencil<'a> {
+    pub depth_stencil_view: &'a DepthStencilView,
+    pub load_mode: RenderPassTextureLoadMode,
+    pub store_mode: RenderPassTextureStoreMode,
+    pub clear_value: ClearValue,
+}
+
 pub struct RenderPassDesc<'a> {
-    pub render_targets: &'a [RenderPassTexture<'a>],
-    pub depth_stencil: Option<RenderPassTexture<'a>>,
+    pub render_targets: &'a [RenderPassRenderTarget<'a>],
+    pub depth_stencil: Option<RenderPassDepthStencil<'a>>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
@@ -162,6 +170,52 @@ pub struct PipelineShaderStage<'a> {
     pub module: &'a ShaderModule,
 }
 
+#[derive(Copy, Clone)]
+pub enum StencilOp {
+    Keep,
+    Zero,
+    Replace,
+    IncrementAndClamp,
+    DecrementAndClamp,
+    Invert,
+    IncrementAndWrap,
+    DecrementAndWrap,
+}
+
+#[derive(Clone)]
+pub struct PipelineStencilOpState {
+    pub fail_op: StencilOp,
+    pub depth_fail_op: StencilOp,
+    pub pass_op: StencilOp,
+    pub compare_op: CompareOp,
+}
+
+impl Default for PipelineStencilOpState {
+    fn default() -> Self {
+        Self {
+            fail_op: StencilOp::Keep,
+            depth_fail_op: StencilOp::Keep,
+            pass_op: StencilOp::Keep,
+            compare_op: CompareOp::Never,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct PipelineDepthStencilState {
+    pub depth_test_enable: bool,
+    pub depth_write_mask: i32,
+    pub depth_write_enable: bool,
+    pub depth_compare_op: CompareOp,
+    pub stencil_test_enable: bool,
+    pub stencil_read_mask: u8,
+    pub stencil_write_mask: u8,
+    pub front: PipelineStencilOpState,
+    pub back: PipelineStencilOpState,
+}
+
+// ----------------------
+
 pub struct BufferCopyRegion {
     pub src_offset_in_bytes: u64,
     pub dst_offset_in_bytes: u64,
@@ -187,38 +241,42 @@ pub enum IndexBufferFormat {
     Uint32,
 }
 
-// Shader resource view
+#[derive(Default, Clone)]
+pub struct BufferSRVRaw {
+    pub offset_in_bytes: u32,
+}
 
 #[derive(Clone)]
+pub struct BufferSRVStructured {
+    pub offset_in_bytes: u64,
+    pub stride_in_bytes: u32,
+}
+
+#[derive(Clone)]
+pub enum BufferSRVType {
+    Raw(BufferSRVRaw),
+    Structured(BufferSRVStructured),
+}
+
+// Shader resource view
+#[derive(Clone)]
 pub struct BufferSRV {
-    pub first_element_index: u32,
-    pub element_count: u32,
-    pub element_size_in_bytes: u32,
+    pub buffer: Arc<Buffer>,
+    pub ty: BufferSRVType,
 }
 
 #[derive(Clone)]
 pub struct Texture2DSRV {
+    pub texture: Arc<Texture>,
+    pub format: PixelFormat,
     pub min_mip_level: u32,
     pub mip_levels: u32,
 }
 
 #[derive(Clone)]
-pub enum ShaderResourceViewType {
+pub enum ShaderResourceViewDesc {
     Buffer(BufferSRV),
     Texture2D(Texture2DSRV),
-}
-
-#[derive(Clone)]
-pub enum ShaderResourceViewResource {
-    Buffer(Arc<Buffer>),
-    Texture(Arc<Texture>),
-}
-
-#[derive(Clone)]
-pub struct ShaderResourceViewDesc {
-    pub resource: ShaderResourceViewResource,
-    pub format: PixelFormat,
-    pub ty: ShaderResourceViewType,
 }
 
 // Render target view
@@ -238,6 +296,25 @@ pub struct RenderTargetViewDesc {
     pub resource: Arc<Texture>,
     pub format: PixelFormat,
     pub ty: RenderTargetViewType,
+}
+
+// Depth stencil view
+
+#[derive(Clone)]
+pub struct Texture2DDSV {
+    pub mip_level: u32,
+}
+
+#[derive(Clone)]
+pub enum DepthStencilViewType {
+    Texture2D(Texture2DDSV),
+}
+
+#[derive(Clone)]
+pub struct DepthStencilViewDesc {
+    pub resource: Arc<Texture>,
+    pub format: PixelFormat,
+    pub ty: DepthStencilViewType,
 }
 
 pub struct Viewport {
@@ -313,8 +390,19 @@ pub trait Device: Send + Sync {
     fn begin_frame(&self);
     fn end_frame(&self);
 
-    fn create_buffer(&self, info: &BufferDesc, name: &str) -> Result<Buffer, DeviceError>;
-    fn create_texture(&self, info: &TextureDesc, name: &str) -> Result<Texture, DeviceError>;
+    fn create_buffer(
+        &self,
+        info: &BufferDesc,
+        memory_pool: Option<&MemoryPool>,
+        name: &str,
+    ) -> Result<Buffer, DeviceError>;
+    fn create_texture(
+        &self,
+        info: &TextureDesc,
+        memory_pool: Option<&MemoryPool>,
+        name: &str,
+    ) -> Result<Texture, DeviceError>;
+
     fn create_shader_resource_view(
         &self,
         desc: &ShaderResourceViewDesc,
@@ -323,6 +411,10 @@ pub trait Device: Send + Sync {
         &self,
         desc: &RenderTargetViewDesc,
     ) -> Result<RenderTargetView, DeviceError>;
+    fn create_depth_stencil_view(
+        &self,
+        desc: &DepthStencilViewDesc,
+    ) -> Result<DepthStencilView, DeviceError>;
     fn create_swapchain(
         &self,
         info: &SwapChainDesc,
@@ -355,6 +447,9 @@ pub trait Device: Send + Sync {
         index: u32,
     ) -> Result<Arc<Texture>, DeviceError>;
     fn present(&self, swapchain: &SwapChain);
+
+    // Memory pool functions
+    fn transient_memory_pool(&self) -> &MemoryPool;
 
     // Transfer functions
     fn cmd_copy_buffer_regions(
@@ -391,6 +486,11 @@ pub trait Device: Send + Sync {
         state: &PipelineInputAssemblyState,
     );
     fn cmd_set_blend_state(&self, cmd_list: &mut CommandList, state: &PipelineBlendState);
+    fn cmd_set_depth_stencil_state(
+        &self,
+        cmd_list: &mut CommandList,
+        state: &PipelineDepthStencilState,
+    );
     fn cmd_bind_index_buffer(
         &self,
         cmd_list: &mut CommandList,
@@ -414,6 +514,13 @@ pub trait Device: Send + Sync {
         first_index: u32,
         first_instance: u32,
     );
+    fn cmd_dispatch_mesh(
+        &self,
+        cmd_list: &mut CommandList,
+        thread_group_x: u32,
+        thread_group_y: u32,
+        thread_group_z: u32,
+    );
 
     /// Submit work to a specific queue to the GPU, optionally waiting or signaling fences
     fn submit(
@@ -424,7 +531,7 @@ pub trait Device: Send + Sync {
         signal_fences: &[&Fence],
     );
 
-    // Block the current thread until all GPU queues are flushed
+    /// Block the current thread until all GPU queues are flushed
     fn wait_idle(&self);
 }
 
@@ -433,6 +540,22 @@ pub trait Device: Send + Sync {
 pub enum MemoryLocation {
     CpuToGpu,
     GpuOnly,
+}
+
+#[bitflags]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[repr(u32)]
+pub enum MemoryFlagBits {
+    /// Allow memory to be aliased with another resource
+    /// Other resource must be provided in [`MemoryDesc`]
+    Aliased = 1 << 0,
+}
+pub type MemoryFlags = BitFlags<MemoryFlagBits>;
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct MemoryDesc {
+    pub memory_location: MemoryLocation,
+    pub memory_flags: MemoryFlags,
 }
 
 #[bitflags]
@@ -449,7 +572,7 @@ pub type BufferUsageFlags = BitFlags<BufferUsageFlagBits>;
 pub struct BufferDesc {
     pub size_bytes: u64,
     pub usage: BufferUsageFlags,
-    pub memory_location: MemoryLocation,
+    pub memory_desc: MemoryDesc,
     pub default_resource_state: ResourceState,
 }
 
@@ -473,6 +596,8 @@ impl Buffer {
 pub enum TextureUsageFlagBits {
     UnorderedAccess = 1 << 0,
     RenderTarget = 1 << 1,
+    DepthStencil = 1 << 2,
+    Sampled = 1 << 3,
 }
 pub type TextureUsageFlags = BitFlags<TextureUsageFlagBits>;
 
@@ -485,7 +610,7 @@ pub struct TextureDesc {
     pub format: PixelFormat,
     pub sample_desc: SampleDesc,
     pub usage_flags: TextureUsageFlags,
-    pub memory_location: MemoryLocation,
+    pub memory_desc: MemoryDesc,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -550,6 +675,17 @@ impl RenderTargetView {
     }
 }
 
+pub struct DepthStencilView {
+    pub desc: DepthStencilViewDesc,
+    pub backend_data: Box<dyn Any + Send>,
+}
+
+impl DepthStencilView {
+    pub fn new(desc: DepthStencilViewDesc, backend_data: Box<dyn Any + Send>) -> Self {
+        Self { desc, backend_data }
+    }
+}
+
 pub struct CommandList {
     pub backend_data: Box<dyn Any + Send>,
 }
@@ -592,4 +728,14 @@ impl SwapChain {
     }
 }
 
-pub struct Fence {}
+pub struct Fence;
+
+pub struct MemoryPool {
+    pub backend_data: Box<dyn Any + Send + Sync>,
+}
+
+impl MemoryPool {
+    pub fn new(backend_data: Box<dyn Any + Send + Sync>) -> Self {
+        Self { backend_data }
+    }
+}

@@ -30,6 +30,12 @@ inline StructuredBuffer<StructType> get_structured_buffer(ResourceHandle handle)
 {
     return ResourceDescriptorHeap[NonUniformResourceIndex(handle)];
 }
+
+inline ByteAddressBuffer get_byte_address_buffer(ResourceHandle handle)
+{
+    return ResourceDescriptorHeap[NonUniformResourceIndex(handle)];
+}
+
 #else
 #error "Backend doesn't support bindless"
 #endif

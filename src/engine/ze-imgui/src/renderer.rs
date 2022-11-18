@@ -1,12 +1,7 @@
 ﻿use std::mem::{size_of, MaybeUninit};
 use std::slice;
 use std::sync::Arc;
-use ze_gfx::backend::{
-    Buffer, BufferDesc, BufferSRV, BufferUsageFlags, Device, MemoryLocation, RenderTargetView,
-    ResourceState, ShaderResourceView, ShaderResourceViewDesc, ShaderResourceViewResource,
-    ShaderResourceViewType, SwapChain,
-};
-use ze_gfx::PixelFormat;
+use ze_gfx::backend::*;
 use ze_imgui_sys::{ImDrawData, ImDrawIdx, ImDrawVert};
 
 #[derive(Default)]
@@ -33,17 +28,10 @@ impl ViewportRendererData {
 
         if Self::create_or_resize_buffer(device, &mut self.vertex_buffer, vertex_buffer_size) {
             let srv = device
-                .create_shader_resource_view(&ShaderResourceViewDesc {
-                    resource: ShaderResourceViewResource::Buffer(
-                        self.vertex_buffer.as_ref().unwrap().clone(),
-                    ),
-                    format: PixelFormat::Unknown,
-                    ty: ShaderResourceViewType::Buffer(BufferSRV {
-                        first_element_index: 0,
-                        element_count: draw_data.TotalVtxCount as u32,
-                        element_size_in_bytes: size_of::<ImDrawVert>() as u32,
-                    }),
-                })
+                .create_shader_resource_view(&ShaderResourceViewDesc::Buffer(BufferSRV {
+                    buffer: self.vertex_buffer.as_ref().unwrap().clone(),
+                    ty: BufferSRVType::Raw(BufferSRVRaw::default()),
+                }))
                 .expect("Failed to create ImGui vertex buffer srv");
             self.vertex_buffer_srv = Some(srv);
         }
@@ -110,9 +98,13 @@ impl ViewportRendererData {
                 &BufferDesc {
                     size_bytes,
                     usage: BufferUsageFlags::default(),
-                    memory_location: MemoryLocation::CpuToGpu,
+                    memory_desc: MemoryDesc {
+                        memory_location: MemoryLocation::CpuToGpu,
+                        memory_flags: Default::default(),
+                    },
                     default_resource_state: ResourceState::Common,
                 },
+                None,
                 "ImGui Viewport Buffer",
             )
             .expect("Failed to create ImGui viewport vertex buffer");

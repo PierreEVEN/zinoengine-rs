@@ -3,8 +3,8 @@ use crate::archetype::ArchetypeId;
 use crate::system::param::{SystemParam, SystemParamFetch, SystemParamState};
 use crate::system::{IntoSystem, System};
 use crate::world::World;
-use std::cell::SyncUnsafeCell;
 use std::marker::PhantomData;
+use ze_core::sync::SyncUnsafeCell;
 use ze_ecs_macros::repeat_tuples_no_skip;
 
 /// Implementation of [`System`] for functions/closures

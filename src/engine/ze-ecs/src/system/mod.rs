@@ -1,9 +1,9 @@
 use crate::access::Access;
 use crate::system::condition::{ExecutionCondition, IntoExecutionCondition};
 use crate::world::World;
-use std::cell::SyncUnsafeCell;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
+use ze_core::sync::SyncUnsafeCell;
 
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub struct SystemId(&'static str);

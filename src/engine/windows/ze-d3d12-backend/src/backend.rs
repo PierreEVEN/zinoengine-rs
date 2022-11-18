@@ -1,7 +1,7 @@
 ﻿use crate::device::D3D12Device;
 use crate::utils::SendableIUnknown;
 use parking_lot::Mutex;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use windows::core::Interface;
 use windows::Win32::Graphics::Direct3D::D3D_FEATURE_LEVEL_12_0;
 use windows::Win32::Graphics::Direct3D12::*;
@@ -17,6 +17,7 @@ const ENABLE_DEBUG_LAYERS: bool = false;
 
 pub struct D3D12Backend {
     factory: Arc<Mutex<SendableIUnknown<IDXGIFactory4>>>,
+    devices: Mutex<Vec<Weak<D3D12Device>>>,
 }
 
 impl D3D12Backend {
@@ -47,7 +48,7 @@ impl D3D12Backend {
             if let Some(debug) = debug_controller {
                 unsafe {
                     debug.EnableDebugLayer();
-                    debug.SetEnableGPUBasedValidation(true);
+                    debug.SetEnableGPUBasedValidation(false); // FIXME: Latest Agility SDK has a bug that causes crashes when this is enabled
                 }
 
                 ze_info!("Using D3D12 debug layer");
@@ -68,12 +69,17 @@ impl D3D12Backend {
 
         Ok(Arc::new(D3D12Backend {
             factory: Arc::new(Mutex::new(factory.into())),
+            devices: Default::default(),
         }))
     }
 }
 
 impl Drop for D3D12Backend {
     fn drop(&mut self) {
+        for device in self.devices.lock().iter() {
+            assert_eq!(device.strong_count(), 0);
+        }
+
         if ENABLE_DEBUG_LAYERS {
             unsafe {
                 if let Ok(debug) = DXGIGetDebugInterface1::<IDXGIDebug1>(0) {
@@ -121,10 +127,13 @@ impl Backend for D3D12Backend {
                 let mut device: Option<ID3D12Device> = None;
                 if D3D12CreateDevice(&adapter, D3D_FEATURE_LEVEL_12_0, &mut device).is_ok() {
                     let device = device.unwrap();
-                    Ok(Arc::new(D3D12Device::new(
+                    let device = Arc::new(D3D12Device::new(
                         self.factory.clone(),
                         device.into(),
-                    )))
+                        adapter,
+                    ));
+                    self.devices.lock().push(Arc::downgrade(&device));
+                    Ok(device)
                 } else {
                     Err(BackendError::Unsupported)
                 }

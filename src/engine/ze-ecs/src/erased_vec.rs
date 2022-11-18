@@ -1,7 +1,7 @@
 ﻿use std::alloc::Layout;
 use std::any::TypeId;
 use std::ptr;
-use std::ptr::Unique;
+use std::ptr::NonNull;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) struct TypeInfo {
@@ -24,7 +24,7 @@ pub(crate) struct TypeErasedVec {
     type_info: TypeInfo,
     len: usize,
     capacity: usize,
-    data: Unique<u8>,
+    data: NonNull<u8>,
 }
 
 impl TypeErasedVec {
@@ -35,14 +35,14 @@ impl TypeErasedVec {
                 type_info,
                 len: 0,
                 capacity: usize::MAX,
-                data: Unique::dangling(),
+                data: NonNull::dangling(),
             }
         } else {
             Self {
                 type_info,
                 len: 0,
                 capacity: 0,
-                data: Unique::dangling(),
+                data: NonNull::dangling(),
             }
         }
     }
@@ -52,7 +52,7 @@ impl TypeErasedVec {
     /// # Safety
     ///
     /// `value` must point to a valid value with the same type
-    pub unsafe fn push(&mut self, value: Unique<u8>) {
+    pub unsafe fn push(&mut self, value: NonNull<u8>) {
         let index = self.len;
         self.reserve_exact(1);
         self.len += 1;
@@ -105,7 +105,7 @@ impl TypeErasedVec {
     ///
     /// - `index` must be a valid index
     /// - `value` must be a valid pointer to a object with a correct type
-    unsafe fn initialize_unchecked(&mut self, index: usize, value: Unique<u8>) {
+    unsafe fn initialize_unchecked(&mut self, index: usize, value: NonNull<u8>) {
         ptr::copy_nonoverlapping(
             value.as_ptr(),
             self.get_unchecked_mut(index),
@@ -156,28 +156,23 @@ impl TypeErasedVec {
         );
 
         let new_capacity = self.capacity + additional;
-        let (new_layout, _) = self
-            .type_info
-            .layout
-            .repeat(new_capacity)
-            .expect("Invalid layout");
+        let new_layout = Layout::from_size_align(
+            self.type_info.layout.size() * new_capacity,
+            self.type_info.layout.align(),
+        )
+        .unwrap();
+
         let new_data = if self.capacity == 0 {
             unsafe { std::alloc::alloc(new_layout) }
         } else {
             unsafe {
-                std::alloc::realloc(
-                    self.data.as_ptr(),
-                    self.type_info
-                        .layout
-                        .repeat(self.capacity)
-                        .expect("Invalid layout")
-                        .0,
-                    new_layout.size(),
-                )
+                let layout =
+                    Layout::from_size_align(self.capacity, self.type_info.layout.align()).unwrap();
+                std::alloc::realloc(self.data.as_ptr(), layout, new_layout.size())
             }
         };
 
-        self.data = Unique::new(new_data).expect("Failed to allocate data");
+        self.data = NonNull::new(new_data).expect("Failed to allocate data");
         self.capacity = new_capacity;
     }
 }
@@ -192,16 +187,16 @@ impl Drop for TypeErasedVec {
 mod tests {
     use crate::erased_vec::{TypeErasedVec, TypeInfo};
     use std::mem::forget;
-    use std::ptr::Unique;
+    use std::ptr::NonNull;
 
     #[test]
     fn push() {
         let mut numbers: Vec<i32> = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
         let mut vec = TypeErasedVec::new(TypeInfo::new::<i32>());
         unsafe {
-            vec.push(Unique::new(numbers.as_mut_ptr().add(0).cast::<u8>()).unwrap());
-            vec.push(Unique::new(numbers.as_mut_ptr().add(1).cast::<u8>()).unwrap());
-            vec.push(Unique::new(numbers.as_mut_ptr().add(2).cast::<u8>()).unwrap());
+            vec.push(NonNull::new(numbers.as_mut_ptr().add(0).cast::<u8>()).unwrap());
+            vec.push(NonNull::new(numbers.as_mut_ptr().add(1).cast::<u8>()).unwrap());
+            vec.push(NonNull::new(numbers.as_mut_ptr().add(2).cast::<u8>()).unwrap());
 
             let at = |index| {
                 *(vec.get_unchecked(index) as *const i32)
@@ -244,7 +239,7 @@ mod tests {
         let counter = Rc::new(Cell::new(1));
         let mut test = DropTest::new(counter.clone());
         unsafe {
-            vec.push(Unique::new(&mut test as *mut DropTest as *mut u8).unwrap());
+            vec.push(NonNull::new(&mut test as *mut DropTest as *mut u8).unwrap());
         }
         forget(test);
 

@@ -54,8 +54,12 @@ impl IconManager {
                                 format: PixelFormat::R8G8B8A8Unorm,
                                 sample_desc: Default::default(),
                                 usage_flags: TextureUsageFlags::default(),
-                                memory_location: MemoryLocation::GpuOnly,
+                                memory_desc: MemoryDesc {
+                                    memory_location: MemoryLocation::GpuOnly,
+                                    memory_flags: Default::default(),
+                                },
                             },
+                            None,
                             "",
                         )
                         .unwrap(),
@@ -63,14 +67,14 @@ impl IconManager {
 
                 let texture_srv = Arc::new(
                     self.device
-                        .create_shader_resource_view(&ShaderResourceViewDesc {
-                            resource: ShaderResourceViewResource::Texture(texture.clone()),
-                            format: PixelFormat::R8G8B8A8Unorm,
-                            ty: ShaderResourceViewType::Texture2D(Texture2DSRV {
+                        .create_shader_resource_view(&ShaderResourceViewDesc::Texture2D(
+                            Texture2DSRV {
+                                texture: texture.clone(),
+                                format: PixelFormat::R8G8B8A8Unorm,
                                 min_mip_level: 0,
                                 mip_levels: 1,
-                            }),
-                        })
+                            },
+                        ))
                         .unwrap(),
                 );
 

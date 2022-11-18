@@ -10,9 +10,12 @@ pix = []
 [dependencies]
 ze-core = { version = "0.1.0", path = "../../ze-core" }
 ze-gfx = { version = "0.1.0", path = "../../ze-gfx" }
-# windows crate version must be in sync with gpu-allocator's version
-windows = { version = "0.36", features = [ "Win32_Graphics_Direct3D12", "Win32_Graphics_Direct3D", "Win32_Graphics_Dxgi" ] }
-gpu-allocator = { version = "0.18.0", features = [ "d3d12", "windows" ] }
+windows = { version = "0.43.0", features = [ "Win32_Foundation", 
+    "Win32_Graphics_Direct3D12", 
+    "Win32_Graphics_Direct3D", 
+    "Win32_Graphics_Dxgi", 
+    "Win32_Graphics_Dxgi_Common" ] }
+ze-d3dmemoryallocator = { version = "0.1.0", path = "../../../third-party/ze-d3dmemoryallocator" }
 thread_local = "1.1.4"
 raw-window-handle = "0.4.3"
 tinyvec = { version = "1.6.0", features = [ "alloc" ] }
@@ -21,5 +24,5 @@ cfg-if = "1.0.0"
 
 [build-dependencies]
 cc = "1.0.73"
-bindgen = "0.60.1"
+bindgen = "0.61.0"
 cfg-if = "1.0.0"

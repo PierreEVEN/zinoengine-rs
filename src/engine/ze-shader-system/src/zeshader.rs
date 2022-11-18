@@ -230,6 +230,25 @@ impl Declaration {
                         .unwrap()
                         .hlsl;
                     is_in_stage = true;
+                } else if word == "mesh" && !is_in_stage {
+                    if !skip_until(&mut iter, '{') {
+                        return Err("Mesh block never opened.".to_string());
+                    }
+
+                    if declaration.passes[current_pass_index].ty == PassType::Compute {
+                        return Err("Cannot add a mesh block to a compute pass.".to_string());
+                    }
+
+                    blocks.push(Block::Stage);
+                    declaration.passes[current_pass_index]
+                        .stages
+                        .push(Stage::new(ShaderStageFlagBits::Mesh));
+                    current_hlsl_stage = &mut declaration.passes[current_pass_index]
+                        .stages
+                        .last_mut()
+                        .unwrap()
+                        .hlsl;
+                    is_in_stage = true;
                 } else if word == "fragment" && !is_in_stage {
                     if !skip_until(&mut iter, '{') {
                         return Err("Fragment block never opened.".to_string());

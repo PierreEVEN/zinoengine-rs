@@ -2,12 +2,7 @@
 use crate::utils::SendableIUnknown;
 use parking_lot::Mutex;
 use std::collections::VecDeque;
-use windows::Win32::Graphics::Direct3D12::{
-    ID3D12DescriptorHeap, ID3D12Device, D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_DESCRIPTOR_HEAP_DESC,
-    D3D12_DESCRIPTOR_HEAP_FLAG_NONE, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
-    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
-    D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
-};
+use windows::Win32::Graphics::Direct3D12::*;
 
 const MAX_CBV_SRV_UAV_DESCRIPTOR_COUNT: u32 = 1_000_000;
 const MAX_SAMPLER_DESCRIPTOR_COUNT: u32 = 1000;
@@ -56,11 +51,11 @@ pub struct DescriptorManager {
     cbv_srv_uav_heap: DescriptorHeap,
     sampler_heap: DescriptorHeap,
     rtv_heap: DescriptorHeap,
-    _dsv_heap: DescriptorHeap,
+    dsv_heap: DescriptorHeap,
 }
 
 impl DescriptorManager {
-    pub fn new(device: &ID3D12Device) -> Self {
+    pub fn new(device: &ID3D12Device2) -> Self {
         let cbv_srv_uav_heap = unsafe {
             let heap_desc = D3D12_DESCRIPTOR_HEAP_DESC {
                 Type: D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
@@ -133,7 +128,7 @@ impl DescriptorManager {
             cbv_srv_uav_heap: DescriptorHeap::new(cbv_srv_uav_heap, cbv_srv_uav_increment_size),
             sampler_heap: DescriptorHeap::new(sampler_heap, sampler_increment_size),
             rtv_heap: DescriptorHeap::new(rtv_heap, rtv_increment_size),
-            _dsv_heap: DescriptorHeap::new(dsv_heap, dsv_increment_size),
+            dsv_heap: DescriptorHeap::new(dsv_heap, dsv_increment_size),
         }
     }
 
@@ -153,6 +148,10 @@ impl DescriptorManager {
         self.rtv_heap.free(handles);
     }
 
+    pub fn free_dsv_descriptor_handle(&self, handles: (D3D12_CPU_DESCRIPTOR_HANDLE, u32)) {
+        self.dsv_heap.free(handles);
+    }
+
     pub fn free_sampler_descriptor_handle(&self, handles: (D3D12_CPU_DESCRIPTOR_HANDLE, u32)) {
         self.sampler_heap.free(handles);
     }
@@ -169,7 +168,7 @@ impl DescriptorManager {
         self.rtv_heap.allocate()
     }
 
-    pub fn _allocate_dsv_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
-        self._dsv_heap.allocate()
+    pub fn allocate_dsv_descriptor_handle(&self) -> (D3D12_CPU_DESCRIPTOR_HANDLE, u32) {
+        self.dsv_heap.allocate()
     }
 }

@@ -3,7 +3,7 @@ use crate::entity::Entity;
 use crate::sparse_set::{SparseSet, TypeErasedSparseSet};
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
-use std::ptr::Unique;
+use std::ptr::NonNull;
 
 /// Store a specific type of component inside an archetype
 pub(crate) struct Column {
@@ -80,7 +80,7 @@ impl Archetype {
     pub unsafe fn insert_row(
         &mut self,
         entity: Entity,
-        values: Vec<(ComponentId, Unique<u8>)>,
+        values: Vec<(ComponentId, NonNull<u8>)>,
     ) -> usize {
         #[cfg(feature = "profiling")]
         puffin::profile_function!();

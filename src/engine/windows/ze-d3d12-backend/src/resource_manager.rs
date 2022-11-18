@@ -1,56 +1,33 @@
-﻿use crate::device::SendableAllocator;
-use crate::utils::SendableIUnknown;
-use gpu_allocator::d3d12::Allocation;
+﻿use crate::utils::SendableIUnknown;
 use parking_lot::Mutex;
-use std::sync::Arc;
 use windows::Win32::Graphics::Direct3D12::ID3D12Resource;
+use ze_d3dmemoryallocator::Allocation;
 
-pub struct DeferredDestructionResourceEntry {
-    pub resource: SendableIUnknown<ID3D12Resource>,
-    pub allocation: Option<Allocation>,
+pub enum Entry {
+    Resource(SendableIUnknown<ID3D12Resource>),
+    Allocation(Allocation),
 }
 
 /// This object manage resource lifetimes in a elegant way
 /// Providing a way to defer destruction and managing multiple frames
-pub struct ResourceManager {
-    allocator: Arc<Mutex<SendableAllocator>>,
-    queue: Mutex<Vec<DeferredDestructionResourceEntry>>,
+#[derive(Default)]
+pub(crate) struct DeferredResourceQueue {
+    queue: Mutex<Vec<Entry>>,
 }
 
-impl ResourceManager {
-    pub fn new(allocator: Arc<Mutex<SendableAllocator>>) -> Self {
-        Self {
-            allocator,
-            queue: Default::default(),
-        }
+impl DeferredResourceQueue {
+    pub fn push(&self, entry: Entry) {
+        self.queue.lock().push(entry)
     }
 
-    /// Enqueue destruction of a resource in a closure
-    pub fn enqueue_resource_destruction(
-        &self,
-        resource: SendableIUnknown<ID3D12Resource>,
-        allocation: Option<Allocation>,
-    ) {
-        self.queue.lock().push(DeferredDestructionResourceEntry {
-            resource,
-            allocation,
-        })
-    }
-
-    pub fn destroy_resources(&self) {
-        let mut allocator = self.allocator.lock();
-        let mut queue = self.queue.lock();
-
-        for entry in queue.drain(..) {
-            if let Some(allocation) = entry.allocation {
-                allocator.0.free(allocation).unwrap();
-            }
-        }
+    pub fn flush(&self) {
+        self.queue.lock().clear();
     }
 }
 
-impl Drop for ResourceManager {
+impl Drop for DeferredResourceQueue {
     fn drop(&mut self) {
-        self.destroy_resources();
+        self.flush();
+        assert!(self.queue.lock().is_empty());
     }
 }

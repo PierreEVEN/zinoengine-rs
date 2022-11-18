@@ -395,7 +395,6 @@ impl Div<Matrix4x4<f64>> for Matrix4x4<f64> {
 mod tests {
     mod f32 {
         use crate::maths::{Inverse, Matrix4x4};
-        use std::hint::black_box;
 
         #[test]
         fn add() {
@@ -512,7 +511,7 @@ mod tests {
         }
 
         #[test]
-        #[should_panic = "Not invertible: ()"]
+        #[should_panic]
         fn inverse_not_invertible_panic() {
             let a = Matrix4x4::<f32>::from([
                 [1.0, 2.0, 3.0, 3.0],
@@ -520,7 +519,7 @@ mod tests {
                 [1.0, 2.0, 3.0, 3.0],
                 [1.0, 2.0, 3.0, 3.0],
             ]);
-            black_box(a.inverse());
+            a.try_inverse().unwrap();
         }
 
         #[test]
@@ -546,7 +545,6 @@ mod tests {
 
     mod f64 {
         use crate::maths::{Inverse, Matrix4x4};
-        use std::hint::black_box;
 
         #[test]
         fn add() {
@@ -663,7 +661,7 @@ mod tests {
         }
 
         #[test]
-        #[should_panic = "Not invertible: ()"]
+        #[should_panic]
         fn inverse_not_invertible_panic() {
             let a = Matrix4x4::<f64>::from([
                 [1.0, 2.0, 3.0, 3.0],
@@ -671,7 +669,7 @@ mod tests {
                 [1.0, 2.0, 3.0, 3.0],
                 [1.0, 2.0, 3.0, 3.0],
             ]);
-            black_box(a.inverse());
+            a.try_inverse().unwrap();
         }
 
         #[test]
