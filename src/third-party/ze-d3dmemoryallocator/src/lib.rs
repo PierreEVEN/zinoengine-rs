@@ -71,12 +71,13 @@ pub struct PoolDesc {
 impl Allocator {
     pub fn new(desc: AllocatorDesc) -> Result<Allocator, HRESULT> {
         let mut allocator = ptr::null_mut();
+
         let result = unsafe {
             let d3d_desc = D3D12MA_ALLOCATOR_DESC {
                 Flags: 0,
                 pDevice: desc.device.as_raw() as *mut _,
                 PreferredBlockSize: 0,
-                pAllocationCallbacks: ptr::null(),
+                pAllocationCallbacks: ptr::null_mut(),
                 pAdapter: desc.adapter.as_raw() as *mut _,
             };
 

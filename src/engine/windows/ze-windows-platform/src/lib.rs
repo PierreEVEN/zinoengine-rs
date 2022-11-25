@@ -6,11 +6,10 @@ use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 use std::os::raw::c_short;
-use std::ptr::null;
 use std::sync::{Arc, Weak};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{
-    GetLastError, BOOL, HINSTANCE, HWND, LPARAM, LRESULT, NO_ERROR, POINT, RECT, WPARAM,
+    GetLastError, BOOL, COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, NO_ERROR, POINT, RECT, WPARAM,
 };
 use windows::Win32::Graphics::Gdi::{
     ClientToScreen, EnumDisplayMonitors, GetMonitorInfoW, GetStockObject, BLACK_BRUSH, HBRUSH, HDC,
@@ -85,7 +84,7 @@ impl WindowsPlatform {
                 hIcon: Default::default(),
                 hCursor: LoadCursorW(HINSTANCE::default(), IDC_ARROW).unwrap(),
                 hbrBackground: HBRUSH(GetStockObject(BLACK_BRUSH).0),
-                lpszMenuName: Default::default(),
+                lpszMenuName: PCWSTR::null(),
                 lpszClassName: PCWSTR(class_name.as_ptr()),
                 hIconSm: Default::default(),
             };
@@ -102,7 +101,7 @@ impl WindowsPlatform {
                 let dummy_window = CreateWindowExW(
                     WINDOW_EX_STYLE(0),
                     PCWSTR(utf8_to_utf16(WIN_CLASS_NAME).as_ptr()),
-                    PCWSTR::default(),
+                    PCWSTR::null(),
                     WINDOW_STYLE(0),
                     0,
                     0,
@@ -111,7 +110,7 @@ impl WindowsPlatform {
                     HWND::default(),
                     HMENU::default(),
                     HINSTANCE::default(),
-                    null(),
+                    None,
                 );
 
                 SetClassLongPtrW(
@@ -136,7 +135,7 @@ impl WindowsPlatform {
         unsafe {
             EnumDisplayMonitors(
                 HDC::default(),
-                null(),
+                None,
                 Some(enum_display_monitors_callback),
                 LPARAM((&*monitors as *const _) as isize),
             );
@@ -471,7 +470,7 @@ impl Platform for WindowsPlatform {
                 HWND::default(),
                 HMENU::default(),
                 HINSTANCE::default(),
-                null(),
+                None,
             );
 
             if GetLastError() != NO_ERROR {
@@ -479,7 +478,7 @@ impl Platform for WindowsPlatform {
                 return Err(Error::Unknown);
             }
 
-            SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+            SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
 
             ShowWindow(
                 hwnd,

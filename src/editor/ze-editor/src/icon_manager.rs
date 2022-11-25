@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use std::io::Read;
 use std::sync::Arc;
-use url::Url;
+use ze_filesystem::path::Path;
 use ze_filesystem::FileSystem;
 use ze_gfx::backend::*;
 use ze_gfx::utils::copy_data_to_texture;
@@ -17,11 +17,11 @@ pub struct IconManager {
     device: Arc<dyn Device>,
     filesystem: Arc<FileSystem>,
     icons: RwLock<HashMap<String, Arc<Icon>>>,
-    icon_root_dir: Url,
+    icon_root_dir: Path,
 }
 
 impl IconManager {
-    pub fn new(device: Arc<dyn Device>, filesystem: Arc<FileSystem>, icon_root_dir: Url) -> Self {
+    pub fn new(device: Arc<dyn Device>, filesystem: Arc<FileSystem>, icon_root_dir: Path) -> Self {
         Self {
             device,
             filesystem,
@@ -36,9 +36,9 @@ impl IconManager {
             Some(icon.clone())
         } else {
             drop(icons);
-            let url = self.icon_root_dir.clone();
-            let url = url.join(&format!("{}{}", name, ".png")).unwrap();
-            if let Ok(mut file) = self.filesystem.read(&url) {
+            let path = self.icon_root_dir.clone();
+            let path = path.join(&format!("{}{}", name, ".png"));
+            if let Ok(mut file) = self.filesystem.read(&path) {
                 let mut data = vec![];
                 file.read_to_end(&mut data).unwrap();
                 let image = image::load_from_memory(&data).unwrap();

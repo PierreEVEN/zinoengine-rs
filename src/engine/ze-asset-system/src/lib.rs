@@ -5,11 +5,11 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
-use url::Url;
 use uuid::{Error, Uuid};
 use ze_core::downcast_rs::{impl_downcast, DowncastSync};
 use ze_core::type_uuid::DynTypeUuid;
 use ze_core::{ze_error, ze_info};
+use ze_filesystem::path::Path;
 
 pub const ASSET_METADATA_EXTENSION: &str = "zeassetmeta";
 
@@ -24,20 +24,20 @@ pub enum AssetLoadResult {
 }
 
 pub trait AssetProvider {
-    fn load(&self, uuid: Uuid, url: &Url) -> Result<AssetLoadResult, LoadError>;
+    fn load(&self, uuid: Uuid, path: &Path) -> Result<AssetLoadResult, LoadError>;
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum LoadError {
-    InvalidUrl,
+    InvalidPath,
     NotFound,
     NoViableLoader,
     LoaderError(loader::Error),
 }
 
-impl From<uuid::Error> for LoadError {
+impl From<Error> for LoadError {
     fn from(_: Error) -> Self {
-        Self::InvalidUrl
+        Self::InvalidPath
     }
 }
 
@@ -62,12 +62,11 @@ impl Default for AssetManager {
 }
 
 impl AssetManager {
-    pub fn load_sync(&self, url: &Url) -> Result<Arc<dyn Asset>, LoadError> {
+    pub fn load_sync(&self, path: &Path) -> Result<Arc<dyn Asset>, LoadError> {
         // Try searching the cache first
         let asset_uuid = {
             let asset_cache = self.asset_cache.read();
-            let path = url.path().split_at(1).1;
-            let uuid = Uuid::from_str(path)?;
+            let uuid = Uuid::from_str(path.path())?;
             if let Some(asset) = asset_cache.get(&uuid) {
                 if let Some(asset) = asset.upgrade() {
                     return Ok(asset);
@@ -76,16 +75,16 @@ impl AssetManager {
             uuid
         };
 
-        ze_info!("Loading \"{}\"", url);
+        ze_info!("Loading \"{}\"", path);
 
         if asset_uuid.is_nil() {
-            ze_error!("Invalid asset UUID for \"{}\"", url);
-            return Err(LoadError::InvalidUrl);
+            ze_error!("Invalid asset UUID for \"{}\"", path);
+            return Err(LoadError::InvalidPath);
         }
 
         let providers = self.providers.read();
         for (provider, _) in providers.iter() {
-            match provider.load(asset_uuid, url) {
+            match provider.load(asset_uuid, path) {
                 Ok(result) => {
                     return match result {
                         AssetLoadResult::Loaded(asset) => Ok(asset),
@@ -104,7 +103,7 @@ impl AssetManager {
                 }
                 Err(error) => {
                     if error != LoadError::NotFound {
-                        ze_error!("No provider for \"{}\"", url);
+                        ze_error!("No provider for \"{}\"", path);
                         return Err(error);
                     }
                 }
@@ -161,7 +160,7 @@ impl TemporaryAssetProvider {
 }
 
 impl AssetProvider for TemporaryAssetProvider {
-    fn load(&self, uuid: Uuid, _: &Url) -> Result<AssetLoadResult, LoadError> {
+    fn load(&self, uuid: Uuid, _: &Path) -> Result<AssetLoadResult, LoadError> {
         if let Some(asset) = self.assets.read().get(&uuid) {
             Ok(AssetLoadResult::Loaded(asset.clone()))
         } else {
@@ -172,4 +171,3 @@ impl AssetProvider for TemporaryAssetProvider {
 
 pub mod importer;
 pub mod loader;
-pub extern crate url;

@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::mem;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
+use ze_core::color::Color4f32;
 use ze_gfx::backend::*;
 use ze_gfx::PixelFormat;
 
@@ -130,8 +131,20 @@ impl<'a> CompiledFrameGraph<'a> {
     }
 
     pub fn execute(&mut self, cmd_list: &mut CommandList) {
+        self.device.cmd_debug_begin_event(
+            cmd_list,
+            "Render Graph",
+            Color4f32::new(0.75, 0.3, 0.15, 1.0),
+        );
+
         let mut passes = mem::take(&mut self.passes);
         for pass in &mut passes {
+            self.device.cmd_debug_begin_event(
+                cmd_list,
+                &pass.name,
+                Color4f32::new(0.3, 0.75, 0.15, 1.0),
+            );
+
             self.prepare_pass_resources(pass);
 
             // Apply invalidate barriers
@@ -204,7 +217,11 @@ impl<'a> CompiledFrameGraph<'a> {
 
                 self.device.cmd_resource_barrier(cmd_list, &barriers);
             }
+
+            self.device.cmd_debug_end_event(cmd_list);
         }
+
+        self.device.cmd_debug_end_event(cmd_list);
         self.passes = passes;
     }
 
@@ -302,6 +319,7 @@ struct Barrier {
 }
 
 struct CompiledPass<'a> {
+    name: String,
     invalidate_barriers: Vec<Barrier>,
     flush_barriers: Vec<Barrier>,
     render_targets: Vec<CompiledPassRenderTarget>,
@@ -484,6 +502,7 @@ impl<'a> FrameGraph<'a> {
             }
 
             compilation_data.compiled_passes.push(CompiledPass {
+                name: pass.name,
                 invalidate_barriers: vec![],
                 flush_barriers: vec![],
                 render_targets,

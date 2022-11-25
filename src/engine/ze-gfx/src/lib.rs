@@ -18,6 +18,7 @@ pub enum PixelFormat {
 
     // RGBA formats
     R8G8B8A8Unorm,
+    R16G16B16A16Sfloat,
 
     // Depth/stencil formats
     D24UnormS8Uint,
@@ -32,6 +33,8 @@ impl PixelFormat {
             | PixelFormat::R8G8B8A8Unorm => 4,
 
             PixelFormat::R8Unorm => 1,
+
+            PixelFormat::R16G16B16A16Sfloat => 8,
 
             // Depth/stencil formats
             PixelFormat::D24UnormS8Uint => 4,

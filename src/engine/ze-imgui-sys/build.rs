@@ -35,7 +35,7 @@ fn main() -> io::Result<()> {
                 .cpp_link_stdlib("c++")
                 .compile("cimgui");
         }
-    };
+    }
 
     println!("cargo:rustc-link-lib=static=cimgui");
 

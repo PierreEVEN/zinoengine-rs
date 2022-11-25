@@ -1,5 +1,5 @@
 ﻿use crate::utf8_to_utf16;
-use raw_window_handle::{RawWindowHandle, Win32Handle};
+use raw_window_handle::{RawWindowHandle, Win32WindowHandle};
 use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 use std::sync::Arc;
 use windows::core::*;
@@ -122,7 +122,7 @@ impl Window for WindowsWindow {
     }
 
     fn handle(&self) -> RawWindowHandle {
-        let mut handle = Win32Handle::empty();
+        let mut handle = Win32WindowHandle::empty();
         handle.hwnd = self.hwnd.0 as *mut std::ffi::c_void;
         RawWindowHandle::Win32(handle)
     }

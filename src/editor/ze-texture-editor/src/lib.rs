@@ -1,11 +1,10 @@
 use enumflags2::make_bitflags;
-use std::str::FromStr;
 use std::sync::Arc;
-use url::Url;
 use uuid::Uuid;
 use ze_asset_editor::{AssetEditor, AssetEditorDrawContext, AssetEditorFactory};
 use ze_asset_system::importer::SourceAssetMetadata;
 use ze_asset_system::{Asset, AssetManager};
+use ze_filesystem::path::Path;
 use ze_filesystem::FileSystem;
 use ze_imgui::ze_imgui_sys::{ImVec2, ImVec4};
 use ze_imgui::{
@@ -16,8 +15,8 @@ use ze_texture_asset::Texture;
 
 pub struct Editor {
     uuid: Uuid,
-    _source_url: Url,
-    metadata_url: Url,
+    _source_path: Path,
+    metadata_path: Path,
     texture: Arc<dyn Asset>,
     metadata: SourceAssetMetadata<(), ze_texture_asset::importer::Parameters>,
 }
@@ -126,7 +125,7 @@ impl AssetEditor for Editor {
             Err(_) => return false,
         };
 
-        if let Ok(mut metadata_file) = filesystem.write(&self.metadata_url) {
+        if let Ok(mut metadata_file) = filesystem.write(&self.metadata_path) {
             metadata_file.write_all(yaml.as_bytes()).is_ok()
         } else {
             false
@@ -153,20 +152,20 @@ impl AssetEditorFactory for EditorFactory {
         &self,
         filesystem: &FileSystem,
         asset: Uuid,
-        source_url: &Url,
-        metadata_url: &Url,
+        source_path: &Path,
+        metadata_path: &Path,
     ) -> Option<Box<dyn AssetEditor>> {
         let texture = self
             .asset_manager
-            .load_sync(&Url::from_str(&format!("assets:///{}", asset)).unwrap())
+            .load_sync(&Path::parse(&format!("//{}", asset)).unwrap())
             .unwrap();
 
-        if let Ok(metadata_buf) = filesystem.read(metadata_url) {
+        if let Ok(metadata_buf) = filesystem.read(metadata_path) {
             if let Ok(metadata) = metadata_buf.try_into() {
                 Some(Box::new(Editor {
                     uuid: asset,
-                    _source_url: source_url.clone(),
-                    metadata_url: metadata_url.clone(),
+                    _source_path: source_path.clone(),
+                    metadata_path: metadata_path.clone(),
                     texture,
                     metadata,
                 }))

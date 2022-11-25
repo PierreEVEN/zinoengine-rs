@@ -3,13 +3,12 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::hash::Hasher;
-use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use url::Url;
 use ze_core::signals::SyncSignal;
 use ze_core::sparse_vec::SparseVec;
 use ze_core::{ze_error, ze_info};
+use ze_filesystem::path::Path;
 use ze_filesystem::{FileSystem, IterDirFlagBits, IterDirFlags, WatchEvent};
 use ze_gfx::backend::{Device, PipelineShaderStage, ShaderModule};
 use ze_gfx::ShaderStageFlagBits;
@@ -252,21 +251,21 @@ impl ShaderManager {
         })
     }
 
-    pub fn search_shaders(self: &Arc<ShaderManager>, filesystem: &Arc<FileSystem>, path: &Url) {
+    pub fn search_shaders(self: &Arc<ShaderManager>, filesystem: &Arc<FileSystem>, path: &Path) {
         filesystem
             .iter_dir(
                 path,
                 IterDirFlags::from_flag(IterDirFlagBits::Recursive),
                 |entry| {
-                    let path = Path::new(entry.url.path());
+                    let path = std::path::Path::new(entry.path.path());
                     let extension = path.extension().unwrap_or_else(|| OsStr::new(""));
                     if extension == "zeshader" {
-                        if let Ok(()) = self.load_zeshader_file(filesystem, &entry.url) {
+                        if let Ok(()) = self.load_zeshader_file(filesystem, &entry.path) {
                             // Setup a watch for hot-reloading
                             let filesystem_closure = filesystem.clone();
                             let shader_manager = Arc::downgrade(self);
                             filesystem
-                                .watch(&entry.url, move |event| {
+                                .watch(&entry.path, move |event| {
                                     if let WatchEvent::Write(path) = event {
                                         if let Some(shader_manager) = shader_manager.upgrade() {
                                             shader_manager
@@ -348,7 +347,7 @@ impl ShaderManager {
     }
 
     /// Load a .zeshader shader file into a `Shader`
-    fn load_zeshader_file(&self, filesystem: &Arc<FileSystem>, path: &Url) -> Result<(), ()> {
+    fn load_zeshader_file(&self, filesystem: &Arc<FileSystem>, path: &Path) -> Result<(), ()> {
         match self.parse_zeshader_file(filesystem, path) {
             Ok(declaration) => {
                 let mut shaders = self.shaders.write();
@@ -408,7 +407,7 @@ impl ShaderManager {
     fn parse_zeshader_file(
         &self,
         filesystem: &Arc<FileSystem>,
-        path: &Url,
+        path: &Path,
     ) -> Result<zeshader::Declaration, String> {
         match filesystem.read(path) {
             Ok(file) => {

@@ -5,13 +5,12 @@ use sha2::Sha256;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::io::Cursor;
-use std::path::Path;
 use std::sync::Arc;
-use url::Url;
 use uuid::Uuid;
 use ze_asset_system::importer::BoxedAssetImporter;
 use ze_asset_system::{AssetLoadResult, AssetProvider, LoadError, ASSET_METADATA_EXTENSION};
 use ze_core::{ze_error, ze_info};
+use ze_filesystem::path::Path;
 use ze_filesystem::{DirEntryType, FileSystem, IterDirFlagBits, IterDirFlags};
 
 #[derive(Debug)]
@@ -39,7 +38,7 @@ struct SourceAssetDbEntry {
 pub struct AssetServer {
     filesystem: Arc<FileSystem>,
     importers: RwLock<HashMap<String, Arc<dyn BoxedAssetImporter>>>,
-    asset_dirs: Mutex<Vec<Url>>,
+    asset_dirs: Mutex<Vec<Path>>,
     source_db: sled::Db,
     asset_db: sled::Db,
 }
@@ -47,15 +46,15 @@ pub struct AssetServer {
 impl AssetServer {
     pub fn new(
         filesystem: Arc<FileSystem>,
-        asset_dirs: Vec<Url>,
-        cache_url: Url,
+        asset_dirs: Vec<Path>,
+        cache_path: Path,
     ) -> Result<Self, Error> {
         // Create or load our source asset database
         let source_db = {
-            let mut url = cache_url.clone();
-            url.path_segments_mut().unwrap().push("source-db");
+            let mut path = cache_path.clone();
+            path.push("source-db");
 
-            let path = match filesystem.to_underlying_path(&url) {
+            let path = match filesystem.to_underlying_path(&path) {
                 Ok(path) => path,
                 Err(_) => return Err(Error::CannotCreateOrOpenSourceDb),
             };
@@ -68,10 +67,10 @@ impl AssetServer {
 
         // Same for the asset database
         let asset_db = {
-            let mut url = cache_url;
-            url.path_segments_mut().unwrap().push("asset-db");
+            let mut path = cache_path;
+            path.push("asset-db");
 
-            let path = match filesystem.to_underlying_path(&url) {
+            let path = match filesystem.to_underlying_path(&path) {
                 Ok(path) => path,
                 Err(_) => return Err(Error::CannotCreateOrOpenSourceDb),
             };
@@ -94,7 +93,7 @@ impl AssetServer {
         Ok(server)
     }
 
-    pub fn add_asset_paths(&self, paths: &[Url]) {
+    pub fn add_asset_paths(&self, paths: &[Path]) {
         let mut asset_dirs = self.asset_dirs.lock();
         for path in paths {
             asset_dirs.push(path.clone());
@@ -110,7 +109,7 @@ impl AssetServer {
                     IterDirFlags::from_flag(IterDirFlagBits::Recursive),
                     |entry| {
                         if entry.ty == DirEntryType::File {
-                            self.process_potential_source_asset(&entry.url);
+                            self.process_potential_source_asset(&entry.path);
                         }
                     },
                 )
@@ -152,12 +151,15 @@ impl AssetServer {
         self.importers.read().get(extension).is_some()
     }
 
-    fn process_potential_source_asset(&self, url: &Url) {
-        let key = url.as_str();
+    fn process_potential_source_asset(&self, path: &Path) {
+        let key = path.as_str();
 
         let current_file_hash = {
             let mut hasher = Sha256::new();
-            let mut file = self.filesystem.read(url).unwrap();
+            let mut file = self
+                .filesystem
+                .read(path)
+                .unwrap_or_else(|_| panic!("Failed to open file {}", path));
             std::io::copy(&mut file, &mut hasher).unwrap();
             hasher.finalize()
         };
@@ -170,23 +172,23 @@ impl AssetServer {
                     .expect("source database maybe corrupted!")
                     .0;
 
-            let metadata_url = {
-                let mut url = url.clone();
+            let metadata_path = {
+                let mut path = path.clone();
                 let asset_path =
-                    url.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
-                let path = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
-                url.set_path(&path);
-                url
+                    path.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
+                let path_str = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
+                path.set_path(&path_str);
+                path
             };
 
             if entry.source_hash_sha256.as_slice() != current_file_hash.as_slice()
-                || !self.filesystem.exists(&metadata_url)
+                || !self.filesystem.exists(&metadata_path)
             {
                 entry.source_hash_sha256 = current_file_hash.to_vec();
-                if self.import_source_asset(url) {
+                if self.import_source_asset(path) {
                     self.source_db
                         .insert(
-                            url.as_str(),
+                            path.as_str(),
                             bincode::serde::encode_to_vec(entry, bincode::config::standard())
                                 .expect("Cannot encode source asset database correctly!"),
                         )
@@ -198,10 +200,10 @@ impl AssetServer {
                 source_hash_sha256: current_file_hash.to_vec(),
             };
 
-            if self.import_source_asset(url) {
+            if self.import_source_asset(path) {
                 self.source_db
                     .insert(
-                        url.as_str(),
+                        path.as_str(),
                         bincode::serde::encode_to_vec(entry, bincode::config::standard())
                             .expect("Cannot encode source asset database correctly!"),
                     )
@@ -210,27 +212,27 @@ impl AssetServer {
         }
     }
 
-    pub fn import_source_asset(&self, url: &Url) -> bool {
-        let path = Path::new(url.path());
-        let extension = path.extension().unwrap().to_string_lossy();
+    pub fn import_source_asset(&self, path: &Path) -> bool {
+        let fs_path = std::path::Path::new(path.path());
+        let extension = fs_path.extension().unwrap().to_string_lossy();
         if extension == ASSET_METADATA_EXTENSION {
             return false;
         }
 
         if let Some(importer) = self.importer_for_extension(&extension) {
-            ze_info!("Importing {}", url.to_string());
+            ze_info!("Importing {}", path.to_string());
 
-            let metadata_url = {
-                let mut url = url.clone();
+            let metadata_path = {
+                let mut path = path.clone();
                 let asset_path =
-                    url.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
-                let path = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
-                url.set_path(&path);
-                url
+                    path.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
+                let path_str = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
+                path.set_path(&path_str);
+                path
             };
 
-            let mut file = self.filesystem.read(url).unwrap();
-            match importer.import(&self.filesystem, url, &mut file, &metadata_url) {
+            let mut file = self.filesystem.read(path).unwrap();
+            match importer.import(&self.filesystem, path, &mut file, &metadata_path) {
                 Ok(assets) => {
                     for asset in assets {
                         self.asset_db
@@ -247,12 +249,12 @@ impl AssetServer {
                     true
                 }
                 Err(error) => {
-                    ze_error!("Failed to import asset {}: {:?}", url, error);
+                    ze_error!("Failed to import asset {}: {:?}", path, error);
                     false
                 }
             }
         } else {
-            ze_error!("No importer for {}", url.to_string());
+            ze_error!("No importer for {}", path.to_string());
             false
         }
     }
@@ -266,14 +268,14 @@ impl AssetServer {
         Some(Uuid::from_slice(&type_uuid_bytes).unwrap())
     }
 
-    pub fn asset_uuid_from_url(&self, url: &Url) -> Option<Uuid> {
-        let metadata_url = {
-            let mut url = url.clone();
+    pub fn asset_uuid_from_path(&self, path: &Path) -> Option<Uuid> {
+        let metadata_path = {
+            let mut path = path.clone();
             let asset_path =
-                url.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
-            let path = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
-            url.set_path(&path);
-            url
+                path.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
+            let path_str = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
+            path.set_path(&path_str);
+            path
         };
 
         #[derive(Deserialize)]
@@ -281,7 +283,7 @@ impl AssetServer {
             uuid: Uuid,
         }
 
-        if let Ok(file) = self.filesystem.read(&metadata_url) {
+        if let Ok(file) = self.filesystem.read(&metadata_path) {
             if let Ok(metadata) = serde_yaml::from_reader(file) {
                 let metadata: Metadata = metadata;
                 return Some(metadata.uuid);
@@ -308,7 +310,7 @@ impl AssetServerProvider {
 }
 
 impl AssetProvider for AssetServerProvider {
-    fn load(&self, uuid: Uuid, _: &Url) -> Result<AssetLoadResult, LoadError> {
+    fn load(&self, uuid: Uuid, _: &Path) -> Result<AssetLoadResult, LoadError> {
         match self.asset_server.asset_data(uuid) {
             Ok(data) => Ok(AssetLoadResult::Serialized(
                 data.0,

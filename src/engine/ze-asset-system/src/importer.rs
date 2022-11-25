@@ -3,8 +3,8 @@ use serde::Serialize;
 use std::io;
 use std::io::{Read, Write};
 use std::sync::Arc;
-use url::Url;
 use uuid::Uuid;
+use ze_filesystem::path::Path;
 use ze_filesystem::FileSystem;
 
 pub struct ImportedAsset {
@@ -40,14 +40,14 @@ pub type AssetImporterResult<S, P> = (Vec<ImportedAsset>, SourceAssetMetadata<S,
 /// Object capable of importing source assets
 pub trait AssetImporter: Send + 'static {
     /// Type storing asset state, serialized into .zeassetmeta file
-    type State: serde::Serialize + serde::de::DeserializeOwned + Send + Sync + 'static;
+    type State: serde::Serialize + DeserializeOwned + Send + Sync + 'static;
 
     /// Type storing import parameters, serialized into .zeassetmeta file
-    type Parameters: serde::Serialize + serde::de::DeserializeOwned + Send + Sync + 'static;
+    type Parameters: serde::Serialize + DeserializeOwned + Send + Sync + 'static;
 
     fn import(
         &self,
-        src_url: &Url,
+        src_path: &Path,
         src: &mut dyn Read,
         metadata: Option<SourceAssetMetadata<Self::State, Self::Parameters>>,
     ) -> Result<AssetImporterResult<Self::State, Self::Parameters>, Error>;
@@ -84,9 +84,9 @@ pub trait BoxedAssetImporter: Send + Sync + 'static {
     fn import(
         &self,
         filesystem: &Arc<FileSystem>,
-        src_url: &Url,
+        src_path: &Path,
         src: &mut dyn Read,
-        metadata_url: &Url,
+        metadata_path: &Path,
     ) -> Result<Vec<ImportedAsset>, Error>;
 }
 
@@ -97,13 +97,13 @@ where
     fn import(
         &self,
         filesystem: &Arc<FileSystem>,
-        src_url: &Url,
+        src_path: &Path,
         src: &mut dyn Read,
-        metadata_url: &Url,
+        metadata_path: &Path,
     ) -> Result<Vec<ImportedAsset>, Error> {
         // If we don't have any metadata, we rely on the importer to provide one
         let metadata: Option<SourceAssetMetadata<T::State, T::Parameters>> =
-            match filesystem.read(metadata_url) {
+            match filesystem.read(metadata_path) {
                 Ok(file) => match serde_yaml::from_reader(file) {
                     Ok(metadata) => metadata,
                     Err(error) => return Err(Error::InvalidYaml(error)),
@@ -111,11 +111,11 @@ where
                 Err(_) => None,
             };
 
-        let (assets, metadata) = self.import(src_url, src, metadata)?;
+        let (assets, metadata) = self.import(src_path, src, metadata)?;
 
         // Write metadata to the .zeassetmeta file
         let yaml = serde_yaml::to_string(&metadata)?;
-        let mut metadata_file = filesystem.write(metadata_url)?;
+        let mut metadata_file = filesystem.write(metadata_path)?;
         metadata_file.write_all(yaml.as_bytes())?;
 
         Ok(assets)

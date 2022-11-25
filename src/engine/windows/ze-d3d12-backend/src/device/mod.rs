@@ -1055,9 +1055,9 @@ impl Device for D3D12Device {
         c_name.push(0);
         let color: Color4u8 = color.into();
         unsafe {
-            let cmd_list = mem::transmute_copy::<
-                ID3D12GraphicsCommandList4,
-                *mut pix::ID3D12GraphicsCommandList,
+            let cmd_list = std::mem::transmute_copy::<
+                ID3D12GraphicsCommandList6,
+                *mut crate::pix::ID3D12GraphicsCommandList,
             >(&cmd_list.cmd_list.0);
 
             pix_begin_event_cmd_list(cmd_list, color.r, color.g, color.b, c_name.as_ptr());
@@ -1077,9 +1077,9 @@ impl Device for D3D12Device {
         };
 
         unsafe {
-            let cmd_list = mem::transmute_copy::<
-                ID3D12GraphicsCommandList4,
-                *mut pix::ID3D12GraphicsCommandList,
+            let cmd_list = std::mem::transmute_copy::<
+                ID3D12GraphicsCommandList6,
+                *mut crate::pix::ID3D12GraphicsCommandList,
             >(&cmd_list.cmd_list.0);
 
             pix_end_event_cmd_list(cmd_list);

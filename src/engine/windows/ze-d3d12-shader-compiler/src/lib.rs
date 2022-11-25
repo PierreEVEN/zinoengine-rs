@@ -1,8 +1,7 @@
 ﻿use hassle_rs::{Dxc, DxcIncludeHandler};
 use std::io::Read;
-use std::str::FromStr;
 use std::sync::Arc;
-use url::Url;
+use ze_filesystem::path::Path;
 use ze_filesystem::FileSystem;
 use ze_gfx::ShaderStageFlagBits;
 use ze_shader_compiler::{ShaderCompiler, ShaderCompilerInput, ShaderCompilerOutput};
@@ -19,8 +18,8 @@ impl<'a> IncludeHandler<'a> {
 
 impl<'a> DxcIncludeHandler for IncludeHandler<'a> {
     fn load_source(&mut self, filename: String) -> Option<String> {
-        let path = "vfs:///assets/shaders/".to_string() + &filename;
-        if let Ok(mut file) = self.filesystem.read(&Url::from_str(&path).unwrap()) {
+        let path = "//assets/shaders/".to_string() + &filename;
+        if let Ok(mut file) = self.filesystem.read(&Path::parse(&path).unwrap()) {
             let mut content = String::new();
             file.read_to_string(&mut content).unwrap();
             return Some(content);

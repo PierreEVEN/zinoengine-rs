@@ -67,7 +67,7 @@ impl Context {
         platform: Arc<dyn Platform>,
         main_window: Arc<dyn Window>,
     ) -> Box<Self> {
-        let context = unsafe { igCreateContext(std::ptr::null_mut()) };
+        let context = unsafe { igCreateContext(null_mut()) };
 
         let io = unsafe { igGetIO().as_mut().unwrap_unchecked() };
         io.ConfigFlags |= ImGuiConfigFlags__ImGuiConfigFlags_ViewportsEnable as i32;
@@ -122,7 +122,7 @@ impl Context {
         // Build font texture
         let font_texture = unsafe {
             let io = igGetIO().as_mut().unwrap_unchecked();
-            let mut pixels = std::ptr::null_mut();
+            let mut pixels = null_mut();
             let mut width = 0;
             let mut height = 0;
             ImFontAtlas_GetTexDataAsRGBA32(
@@ -130,7 +130,7 @@ impl Context {
                 &mut pixels,
                 &mut width,
                 &mut height,
-                std::ptr::null_mut(),
+                null_mut(),
             );
 
             let texture = device
@@ -497,7 +497,7 @@ impl Context {
         io.Monitors.Capacity = monitor_count as c_int;
         io.Monitors.Size = monitor_count as c_int;
         io.Monitors.Data =
-            unsafe { igMemAlloc((monitor_count * size_of::<ImGuiPlatformMonitor>()) as u64) }
+            unsafe { igMemAlloc((monitor_count * size_of::<ImGuiPlatformMonitor>()) as usize) }
                 as *mut ImGuiPlatformMonitor;
 
         let monitors = unsafe { slice::from_raw_parts_mut(io.Monitors.Data, monitor_count) };
@@ -1280,6 +1280,14 @@ impl Context {
 }
 
 impl Context {
+    pub fn cursor_pos(&mut self) -> ImVec2 {
+        let mut pos = ImVec2::default();
+        unsafe {
+            igGetCursorPos(&mut pos);
+        }
+        pos
+    }
+
     pub fn cursor_screen_pos(&mut self) -> ImVec2 {
         let mut pos = ImVec2::default();
         unsafe {
@@ -1297,6 +1305,18 @@ impl Context {
                 igColorConvertFloat4ToU32(color),
                 2.0,
                 ImDrawFlags__ImDrawFlags_None as i32,
+            )
+        }
+    }
+
+    pub fn window_add_line(&mut self, a: ImVec2, b: ImVec2, color: ImVec4, thickness: f32) {
+        unsafe {
+            ImDrawList_AddLine(
+                igGetWindowDrawList(),
+                a,
+                b,
+                igColorConvertFloat4ToU32(color),
+                thickness,
             )
         }
     }
@@ -1543,7 +1563,7 @@ unsafe extern "C" fn platform_destroy_window(vp: *mut ImGuiViewport) {
         platform_data as *mut u8,
         Layout::new::<ViewportPlatformData>(),
     );
-    (*vp).PlatformUserData = std::ptr::null_mut();
+    (*vp).PlatformUserData = null_mut();
 }
 
 unsafe extern "C" fn platform_get_window_size(_: *mut ImGuiViewport, _: *mut ImVec2) {
@@ -1660,7 +1680,7 @@ unsafe extern "C" fn renderer_destroy_window(vp: *mut ImGuiViewport) {
         renderer_data as *mut u8,
         Layout::new::<ViewportRendererData>(),
     );
-    (*vp).RendererUserData = std::ptr::null_mut();
+    (*vp).RendererUserData = null_mut();
 }
 
 unsafe extern "C" fn renderer_set_window_size(vp: *mut ImGuiViewport, size: ImVec2) {

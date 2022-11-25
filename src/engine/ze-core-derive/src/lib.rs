@@ -31,7 +31,7 @@ pub fn type_uuid_derive(input: TokenStream) -> TokenStream {
                 let bytes = bytes
                     .iter()
                     .map(|byte| format!("{:#X}", byte))
-                    .map(|byte| syn::parse_str::<LitInt>(&byte).unwrap());
+                    .map(|byte| parse_str::<LitInt>(&byte).unwrap());
 
                 let generated_trait = quote! {
                     impl ze_core::type_uuid::TypeUuid for #type_name {

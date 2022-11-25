@@ -2,11 +2,11 @@ use enumflags2::*;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
-use url::Url;
 use ze_asset_server::AssetServer;
 use ze_asset_system::ASSET_METADATA_EXTENSION;
 use ze_core::type_uuid::Uuid;
 use ze_core::ze_info;
+use ze_filesystem::path::Path;
 use ze_filesystem::FileSystem;
 use ze_imgui::ze_imgui_sys::{ImGuiID, ImVec2};
 use ze_imgui::{Cond, Context, Key, WindowFlagBits, WindowFlags};
@@ -22,24 +22,24 @@ pub trait AssetEditorFactory {
         &self,
         filesystem: &FileSystem,
         asset: Uuid,
-        source_url: &Url,
-        metadata_url: &Url,
+        source_path: &Path,
+        metadata_path: &Path,
     ) -> Option<Box<dyn AssetEditor>>;
 }
 
 struct AssetEditorEntry {
     editor: Box<dyn AssetEditor>,
-    source_url: Url,
+    source_path: Path,
     unsaved: bool,
     closing: bool,
     closed: bool,
 }
 
 impl AssetEditorEntry {
-    pub fn new(editor: Box<dyn AssetEditor>, source_url: Url) -> Self {
+    pub fn new(editor: Box<dyn AssetEditor>, source_path: Path) -> Self {
         Self {
             editor,
-            source_url,
+            source_path,
             unsaved: false,
             closing: false,
             closed: false,
@@ -80,7 +80,7 @@ impl AssetEditorManager {
         editors.insert(type_uuid, Box::new(editor));
     }
 
-    pub fn open_asset(&self, type_uuid: Uuid, uuid: Uuid, source_url: &Url) {
+    pub fn open_asset(&self, type_uuid: Uuid, uuid: Uuid, source_path: &Path) {
         let mut editors = self.editors.lock();
         for entry in editors.iter() {
             if entry.editor.asset_uuid() == uuid {
@@ -90,18 +90,19 @@ impl AssetEditorManager {
 
         let factories = self.editor_factories.lock();
         if let Some(factory) = factories.get(&type_uuid) {
-            let metadata_url = {
-                let mut url = source_url.clone();
+            let metadata_path = {
+                let mut path = source_path.clone();
                 let asset_path =
-                    url.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
-                let path = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
-                url.set_path(&path);
-                url
+                    path.path().to_string().rsplit('.').collect::<Vec<&str>>()[1].to_string();
+                let path_str = format!("{}.{}", asset_path, ASSET_METADATA_EXTENSION);
+                path.set_path(&path_str);
+                path
             };
 
             // TODO: Manage errors
-            if let Some(editor) = factory.open(&self.filesystem, uuid, source_url, &metadata_url) {
-                editors.push(AssetEditorEntry::new(editor, source_url.clone()));
+            if let Some(editor) = factory.open(&self.filesystem, uuid, source_path, &metadata_path)
+            {
+                editors.push(AssetEditorEntry::new(editor, source_path.clone()));
             }
         }
     }
@@ -118,16 +119,16 @@ impl AssetEditorManager {
                 flags.insert(WindowFlagBits::UnsavedDocument);
             }
 
-            if imgui.begin_window_closable(entry.source_url.path(), &mut is_open, flags) {
+            if imgui.begin_window_closable(entry.source_path.path(), &mut is_open, flags) {
                 let mut context = AssetEditorDrawContext::default();
                 entry.editor.draw(imgui, &mut context);
 
                 if imgui.is_key_down(Key::LeftCtrl) && imgui.is_key_pressed(Key::S, false) {
-                    ze_info!("Saving {}", entry.source_url);
+                    ze_info!("Saving {}", entry.source_path);
                     if entry.editor.save(&self.filesystem) {
-                        ze_info!("Saved {}", entry.source_url);
+                        ze_info!("Saved {}", entry.source_path);
                         entry.unsaved = false;
-                        self.asset_server.import_source_asset(&entry.source_url);
+                        self.asset_server.import_source_asset(&entry.source_path);
                     }
                 } else if context.need_save {
                     entry.unsaved = true;
@@ -152,7 +153,7 @@ impl AssetEditorManager {
                     && entry.editor.save(&self.filesystem)
                 {
                     imgui.close_current_popup();
-                    self.asset_server.import_source_asset(&entry.source_url);
+                    self.asset_server.import_source_asset(&entry.source_path);
                     entry.closed = true;
                 }
 

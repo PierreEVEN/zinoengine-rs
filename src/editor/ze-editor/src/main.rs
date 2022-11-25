@@ -1,3 +1,5 @@
+extern crate core;
+
 use crate::editor::EditorApplication;
 use ze_core::logger::StdoutSink;
 use ze_core::{logger, thread};

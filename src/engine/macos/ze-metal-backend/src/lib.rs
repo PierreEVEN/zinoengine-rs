@@ -13,7 +13,7 @@ impl MetalBackend {
 impl Backend for MetalBackend {
     fn create_device(
         &self,
-    ) -> Result<std::sync::Arc<dyn ze_gfx::backend::Device>, ze_gfx::backend::BackendError> {
+    ) -> Result<Arc<dyn ze_gfx::backend::Device>, ze_gfx::backend::BackendError> {
         let device = if let Some(device) = metal::Device::system_default() {
             device
         } else {

@@ -8,11 +8,10 @@ ze-core = { version = "0.1.0", path = "../ze-core" }
 ze-asset-system = { version = "0.1.0", path = "../ze-asset-system" }
 ze-filesystem = { version = "0.1.0", path = "../ze-filesystem" }
 parking_lot = "0.12.1"
-url = "2.2.2"
 sled = { version = "0.34.7", features = [] }
 serde = "1.0.140"
 serde_derive = "1.0.140"
-serde_yaml = "0.8.26"
+serde_yaml = "0.9.14"
 bincode = { version = "2.0.0-rc.1", features = [ "serde" ] }
 sha2 = "0.10.2"
 uuid = {version = "1.1.2", features = [ "serde" ] }

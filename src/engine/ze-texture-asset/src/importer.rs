@@ -5,12 +5,12 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 use std::io::Read;
-use url::Url;
 use uuid::Uuid;
 use ze_asset_system::importer::{
     AssetImporter, AssetImporterResult, Error, ImportedAsset, SourceAssetMetadata,
 };
 use ze_core::type_uuid::*;
+use ze_filesystem::path::Path;
 use ze_gfx::PixelFormat;
 use ze_reflection::*;
 
@@ -59,7 +59,7 @@ impl AssetImporter for TextureImporter {
 
     fn import(
         &self,
-        src_url: &Url,
+        src_path: &Path,
         src: &mut dyn Read,
         metadata: Option<SourceAssetMetadata<Self::State, Self::Parameters>>,
     ) -> Result<AssetImporterResult<Self::State, Self::Parameters>, Error> {
@@ -69,7 +69,7 @@ impl AssetImporter for TextureImporter {
         };
 
         let format = {
-            let extension = src_url
+            let extension = src_path
                 .path()
                 .to_string()
                 .rsplit('.')

@@ -1,11 +1,10 @@
-﻿use enumflags2::*;
+﻿use crate::path::Path;
+use enumflags2::*;
 use parking_lot::RwLock;
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::Arc;
-use url::{Host, ParseError, Url};
 use ze_core::ze_info;
 
 /// Represents a filesystem, containing multiple mount points
@@ -31,7 +30,7 @@ impl Display for Error {
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum WatchEvent {
-    Write(Url),
+    Write(Path),
 }
 
 #[derive(PartialEq, Eq, Copy, Clone)]
@@ -43,7 +42,7 @@ pub enum DirEntryType {
 #[derive(PartialEq, Eq, Clone)]
 pub struct DirEntry {
     pub ty: DirEntryType,
-    pub url: Url,
+    pub path: Path,
 }
 
 #[bitflags]
@@ -56,22 +55,22 @@ pub enum IterDirFlagBits {
 pub type IterDirFlags = BitFlags<IterDirFlagBits>;
 
 pub trait MountPoint: Send + Sync {
-    fn exists(&self, path: &Url) -> bool;
-    fn read(&self, path: &Url) -> Result<Box<dyn Read>, Error>;
-    fn write(&self, path: &Url) -> Result<Box<dyn Write>, Error>;
+    fn exists(&self, path: &Path) -> bool;
+    fn read(&self, path: &Path) -> Result<Box<dyn Read>, Error>;
+    fn write(&self, path: &Path) -> Result<Box<dyn Write>, Error>;
     fn iter_dir(
         &self,
-        path: &Url,
+        path: &Path,
         flags: IterDirFlags,
         f: &mut dyn FnMut(&DirEntry),
     ) -> Result<(), Error>;
     fn watch(
         &self,
-        path: &Url,
+        path: &Path,
         f: &Arc<(dyn Fn(WatchEvent) + Send + Sync + 'static)>,
     ) -> Result<(), Error>;
     fn alias(&self) -> &str;
-    fn to_underlying_path(&self, url: &Url) -> Result<PathBuf, Error>;
+    fn to_underlying_path(&self, path: &Path) -> Result<PathBuf, Error>;
 }
 
 impl FileSystem {
@@ -84,14 +83,14 @@ impl FileSystem {
     pub fn mount(&self, mount_point: Box<dyn MountPoint>) {
         // TODO: Ensure no mount points shares theirs aliases
         ze_info!(
-            "Mounted \"{alias}\": vfs://{alias}/",
+            "Mounted \"{alias}\": /{alias}/",
             alias = mount_point.alias()
         );
         self.mount_points.write().push(mount_point);
     }
 
-    pub fn exists(&self, path: &Url) -> bool {
-        if let Some(index) = self.matching_mount_point_for_url(path) {
+    pub fn exists(&self, path: &Path) -> bool {
+        if let Some(index) = self.matching_mount_point_for_path(path) {
             let mount_point_guard = self.mount_points.read();
             mount_point_guard[index].exists(path)
         } else {
@@ -99,8 +98,8 @@ impl FileSystem {
         }
     }
 
-    pub fn read(&self, path: &Url) -> Result<Box<dyn Read>, Error> {
-        if let Some(index) = self.matching_mount_point_for_url(path) {
+    pub fn read(&self, path: &Path) -> Result<Box<dyn Read>, Error> {
+        if let Some(index) = self.matching_mount_point_for_path(path) {
             let mount_point_guard = self.mount_points.read();
             mount_point_guard[index].read(path)
         } else {
@@ -120,8 +119,8 @@ impl FileSystem {
         }
     }
 
-    pub fn write(&self, path: &Url) -> Result<Box<dyn Write>, Error> {
-        if let Some(index) = self.matching_mount_point_for_url(path) {
+    pub fn write(&self, path: &Path) -> Result<Box<dyn Write>, Error> {
+        if let Some(index) = self.matching_mount_point_for_path(path) {
             let mount_point_guard = self.mount_points.read();
             mount_point_guard[index].write(path)
         } else {
@@ -143,11 +142,11 @@ impl FileSystem {
 
     pub fn iter_dir(
         &self,
-        path: &Url,
+        path: &Path,
         flags: IterDirFlags,
         mut f: impl FnMut(&DirEntry),
     ) -> Result<(), Error> {
-        if let Some(index) = self.matching_mount_point_for_url(path) {
+        if let Some(index) = self.matching_mount_point_for_path(path) {
             let mount_point_guard = self.mount_points.read();
             mount_point_guard[index].iter_dir(path, flags, &mut f)
         } else {
@@ -167,13 +166,13 @@ impl FileSystem {
         }
     }
 
-    pub fn watch<F>(&self, path: &Url, f: F) -> Result<(), Error>
+    pub fn watch<F>(&self, path: &Path, f: F) -> Result<(), Error>
     where
         F: Fn(WatchEvent) + Send + Sync + 'static,
     {
         let func: Arc<dyn Fn(WatchEvent) + Send + Sync + 'static> = Arc::new(f);
 
-        if let Some(index) = self.matching_mount_point_for_url(path) {
+        if let Some(index) = self.matching_mount_point_for_path(path) {
             let mount_point_guard = self.mount_points.read();
             mount_point_guard[index].watch(path, &func)
         } else {
@@ -193,21 +192,20 @@ impl FileSystem {
         }
     }
 
-    /// Get the underlying path from the URL. The mount point must be indicated in the URL.
-    pub fn to_underlying_path(&self, url: &Url) -> Result<PathBuf, Error> {
-        if let Some(index) = self.matching_mount_point_for_url(url) {
+    pub fn to_underlying_path(&self, path: &Path) -> Result<PathBuf, Error> {
+        if let Some(index) = self.matching_mount_point_for_path(path) {
             let mount_point_guard = self.mount_points.read();
-            mount_point_guard[index].to_underlying_path(url)
+            mount_point_guard[index].to_underlying_path(path)
         } else {
             Err(Error::UnknownMountPoint)
         }
     }
 
-    fn matching_mount_point_for_url(&self, url: &Url) -> Option<usize> {
-        if let Some(Host::Domain(domain)) = url.host() {
+    fn matching_mount_point_for_path(&self, path: &Path) -> Option<usize> {
+        if let Some(path_mount_point) = path.mount_point() {
             let mount_points = self.mount_points.read();
             for (index, mount_point) in mount_points.iter().enumerate() {
-                if mount_point.alias() == domain {
+                if mount_point.alias() == path_mount_point {
                     return Some(index);
                 }
             }
@@ -217,13 +215,5 @@ impl FileSystem {
     }
 }
 
-pub fn make_url_for_zefs(mount_point: &str, path: &str) -> Result<Url, ParseError> {
-    let url = format!("{VFS_PROTOCOL}{mount_point}{path}");
-    Url::from_str(&url)
-}
-
-const VFS_PROTOCOL: &str = "vfs://";
-
 pub mod mount_points;
-pub extern crate percent_encoding;
-pub extern crate url;
+pub mod path;

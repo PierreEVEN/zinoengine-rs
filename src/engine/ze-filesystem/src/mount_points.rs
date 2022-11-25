@@ -1,19 +1,21 @@
-﻿use crate::{
-    make_url_for_zefs, DirEntry, DirEntryType, Error, IterDirFlagBits, IterDirFlags, MountPoint,
-    WatchEvent,
-};
+﻿use crate::path::{Path as ZefsPath, Path};
+use crate::DirEntry;
+use crate::DirEntryType;
+use crate::Error;
+use crate::IterDirFlagBits;
+use crate::IterDirFlags;
+use crate::MountPoint;
+use crate::WatchEvent;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
-use percent_encoding::percent_decode_str;
 use std::collections::HashMap;
 use std::fs::{read_dir, File};
 use std::io::{ErrorKind, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use url::Url;
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
@@ -44,7 +46,7 @@ pub struct StdMountPoint {
 }
 
 impl StdMountPoint {
-    pub fn new(alias: &str, root: &Path) -> Box<Self> {
+    pub fn new(alias: &str, root: &std::path::Path) -> Box<Self> {
         let (tx, rx) = channel();
         let watcher = Watcher::new(tx, Duration::from_millis(100)).unwrap();
         let watcher_closure_map: Arc<Mutex<HashMap<PathBuf, StdMountPointWatcher>>> =
@@ -72,9 +74,9 @@ impl StdMountPoint {
                                             root.as_ref(),
                                             &path.canonicalize().unwrap(),
                                         );
-                                        f(WatchEvent::Write(
-                                            make_url_for_zefs(&alias, &path).unwrap(),
-                                        ));
+                                        f(WatchEvent::Write(ZefsPath::from_mount_point_and_path(
+                                            &alias, &path,
+                                        )));
                                     }
                                 }
                                 _ => {}
@@ -93,9 +95,13 @@ impl StdMountPoint {
         })
     }
 
-    fn fs_path_to_zefs_path(root: &Path, path: &Path) -> String {
-        let mut path = path.to_string_lossy().to_string();
-        path.replace_range(0..root.as_os_str().len(), "");
+    fn fs_path_to_zefs_path(root: &std::path::Path, path: &std::path::Path) -> String {
+        let path = path.to_string_lossy();
+        let path = &path
+            .strip_prefix(std::path::MAIN_SEPARATOR)
+            .unwrap_or(&path)[root.as_os_str().len()..];
+
+        let path = path.to_string();
 
         #[cfg(windows)]
         let path = path.replace('\\', "/");
@@ -103,8 +109,8 @@ impl StdMountPoint {
         path
     }
 
-    fn to_fs_path(&self, path: &Url) -> PathBuf {
-        let path = percent_decode_str(path.path()).decode_utf8_lossy()[1..].to_string();
+    fn to_fs_path(&self, path: &Path) -> PathBuf {
+        let path = path.path();
 
         // Because we use long paths we can't pass to std::fs functions any forward slashes
         // Only for Windows
@@ -119,24 +125,24 @@ impl StdMountPoint {
 }
 
 impl MountPoint for StdMountPoint {
-    fn exists(&self, path: &Url) -> bool {
+    fn exists(&self, path: &Path) -> bool {
         let path = self.to_fs_path(path);
         path.exists()
     }
 
-    fn read(&self, path: &Url) -> Result<Box<dyn Read>, Error> {
+    fn read(&self, path: &Path) -> Result<Box<dyn Read>, Error> {
         let file = File::open(self.to_fs_path(path))?;
         Ok(Box::new(file))
     }
 
-    fn write(&self, path: &Url) -> Result<Box<dyn Write>, Error> {
+    fn write(&self, path: &Path) -> Result<Box<dyn Write>, Error> {
         let file = File::create(self.to_fs_path(path))?;
         Ok(Box::new(file))
     }
 
     fn iter_dir(
         &self,
-        path: &Url,
+        path: &Path,
         flags: IterDirFlags,
         f: &mut dyn FnMut(&DirEntry),
     ) -> Result<(), Error> {
@@ -146,7 +152,7 @@ impl MountPoint for StdMountPoint {
             let entry = entry?;
 
             let path = Self::fs_path_to_zefs_path(self.root.as_path(), &entry.path());
-            let path = make_url_for_zefs(self.alias(), &path).unwrap();
+            let path = Path::from_mount_point_and_path(self.alias(), &path);
 
             let file_type = entry.file_type().unwrap();
             let entry = DirEntry {
@@ -155,12 +161,12 @@ impl MountPoint for StdMountPoint {
                 } else {
                     DirEntryType::File
                 },
-                url: path,
+                path,
             };
 
             f(&entry);
             if flags.contains(IterDirFlagBits::Recursive) && entry.ty == DirEntryType::Directory {
-                self.iter_dir(&entry.url, flags, f)?;
+                self.iter_dir(&entry.path, flags, f)?;
             }
         }
 
@@ -169,7 +175,7 @@ impl MountPoint for StdMountPoint {
 
     fn watch(
         &self,
-        path: &Url,
+        path: &Path,
         f: &Arc<dyn Fn(WatchEvent) + Send + Sync + 'static>,
     ) -> Result<(), Error> {
         let path = self.to_fs_path(path).canonicalize().unwrap();
@@ -184,7 +190,7 @@ impl MountPoint for StdMountPoint {
         &self.alias
     }
 
-    fn to_underlying_path(&self, url: &Url) -> Result<PathBuf, Error> {
-        Ok(self.to_fs_path(url))
+    fn to_underlying_path(&self, path: &Path) -> Result<PathBuf, Error> {
+        Ok(self.to_fs_path(path))
     }
 }
