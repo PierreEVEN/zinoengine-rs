@@ -410,12 +410,10 @@ impl ShaderManager {
         path: &Path,
     ) -> Result<zeshader::Declaration, String> {
         match filesystem.read(path) {
-            Ok(file) => {
-                return match zeshader::Declaration::from_read(file) {
-                    Ok(decl) => Ok(decl),
-                    Err(msg) => Err(format!("Failed to parse zeshader: {}", msg)),
-                }
-            }
+            Ok(file) => match zeshader::Declaration::from_read(file) {
+                Ok(decl) => Ok(decl),
+                Err(msg) => Err(format!("Failed to parse zeshader: {}", msg)),
+            },
             Err(error) => Err(format!("Failed to read shader ({})", error)),
         }
     }

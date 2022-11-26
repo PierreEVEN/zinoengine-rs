@@ -1,7 +1,9 @@
 extern crate core;
 
 use crate::editor::EditorApplication;
-use ze_core::logger::StdoutSink;
+use std::fs;
+use std::fs::OpenOptions;
+use ze_core::logger::{FileSink, StdoutSink};
 use ze_core::{logger, thread};
 
 #[cfg(target_os = "windows")]
@@ -11,6 +13,14 @@ fn main() {
     puffin::set_scopes_on(true);
     thread::set_thread_name(std::thread::current().id(), "Main Thread".to_string());
     logger::register_sink(StdoutSink::new());
+    fs::create_dir_all("logs").unwrap();
+    logger::register_sink(FileSink::new(
+        OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open("logs/editor.log")
+            .unwrap(),
+    ));
 
     let _server = puffin_http::Server::new("127.0.0.1:8585").unwrap();
 

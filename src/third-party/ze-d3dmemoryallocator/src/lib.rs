@@ -88,7 +88,7 @@ unsafe extern "C" fn d3d12ma_allocate_rust(
 }
 
 unsafe extern "C" fn d3d12ma_free_rust(ptr: *mut c_void, _: *mut c_void) {
-    if ptr != ptr::null_mut() {
+    if !ptr.is_null() {
         std::alloc::dealloc(ptr as *mut _, MEMORY_LAYOUT_MAP.read()[&(ptr as usize)]);
     }
 }

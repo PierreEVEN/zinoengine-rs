@@ -86,13 +86,11 @@ impl JobSystem {
             worker_threads.push(WorkerThread::new(i, queue, shared_worker_data.clone()));
         }
 
-        let jobsystem = Arc::new(Self {
+        Arc::new(Self {
             worker_threads,
             job_allocator: JobAllocator::with_capacity(JOB_CAPACITY_PER_THREAD),
             shared_worker_data,
-        });
-
-        jobsystem
+        })
     }
 
     pub fn spawn<F>(&self, f: F) -> JobBuilder

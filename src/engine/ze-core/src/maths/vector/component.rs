@@ -1,7 +1,7 @@
 macro_rules! impl_component {
     ($type_name:ident -> $($component_name:ident),*) => {
         #[repr(C)]
-        #[derive(Debug, Default, Copy, Clone, PartialEq)]
+        #[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
         pub struct $type_name<T> {
             $(pub $component_name: T),*
         }

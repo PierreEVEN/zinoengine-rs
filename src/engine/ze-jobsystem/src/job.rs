@@ -20,13 +20,13 @@ impl Deref for JobHandle {
     type Target = Job;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { &*(&*self.0).get() }
+        unsafe { &*(*self.0).get() }
     }
 }
 
 impl DerefMut for JobHandle {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *(&*self.0).get() }
+        unsafe { &mut *(*self.0).get() }
     }
 }
 

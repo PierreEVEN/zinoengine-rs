@@ -1,8 +1,9 @@
 ﻿use crate::thread::thread_name;
 use chrono::Local;
 use once_cell::sync::Lazy;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use std::fmt::Arguments;
+use std::fs::File;
 use std::io::Write;
 use std::sync::{Arc, Weak};
 use std::{fmt, thread};
@@ -173,5 +174,40 @@ impl Sink for StdoutSink {
         )
         .unwrap();
         stdout.flush().unwrap();
+    }
+}
+
+pub struct FileSink {
+    file: Mutex<File>,
+}
+
+impl FileSink {
+    pub fn new(file: File) -> Arc<Self> {
+        Arc::new(Self {
+            file: Mutex::new(file),
+        })
+    }
+}
+
+impl Sink for FileSink {
+    fn log(&self, message: &Message) {
+        let thread_name = {
+            match thread_name(message.thread) {
+                None => "Unknown Thread".to_string(),
+                Some(str) => str.as_ref().clone(),
+            }
+        };
+
+        let mut file = self.file.lock();
+        writeln!(
+            &mut file,
+            "[{}] [{}/{}] ({}) {}",
+            message.time.format("%H:%M:%S"),
+            message.severity,
+            thread_name,
+            message.crate_name,
+            message.message
+        )
+        .unwrap();
     }
 }

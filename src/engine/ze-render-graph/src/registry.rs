@@ -90,10 +90,7 @@ impl ResourceRegistry {
 
     pub fn is_texture(&self, handle: ResourceHandle) -> bool {
         let resource = &self.resources[handle.0];
-        match resource.data {
-            ResourceData::Texture(_) => true,
-            _ => false,
-        }
+        matches!(resource.data, ResourceData::Texture(_))
     }
 
     pub fn is_external(&self, handle: ResourceHandle) -> bool {

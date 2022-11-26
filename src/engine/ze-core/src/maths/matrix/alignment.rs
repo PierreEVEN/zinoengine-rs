@@ -6,7 +6,7 @@ pub trait AlignStorage: Sized {
 }
 
 #[repr(C, align(16))]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct AlignedArray16<T, const R: usize>(pub [T; R]);
 
 impl<T: Default + Copy, const R: usize> Default for AlignedArray16<T, R> {
@@ -22,7 +22,7 @@ impl<T, const R: usize> From<[T; R]> for AlignedArray16<T, R> {
 }
 
 #[repr(C, align(32))]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct AlignedArray32<T, const R: usize>(pub [T; R]);
 
 impl<T: Default + Copy, const R: usize> Default for AlignedArray32<T, R> {

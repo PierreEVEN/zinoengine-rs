@@ -382,7 +382,6 @@ mod tests {
             );
         }
         {
-            let accesses = accesses.clone();
             registry.add_system(
                 (move |_: SystemQuery<&mut MyComponent>| {
                     let old = accesses.fetch_add(1, Ordering::SeqCst);

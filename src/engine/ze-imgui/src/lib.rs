@@ -415,7 +415,7 @@ impl Context {
                     self.device.cmd_resource_barrier(
                         cmd_list,
                         &[ResourceBarrier::Transition(ResourceTransitionBarrier {
-                            resource: ResourceTransitionBarrierResource::Texture(&*backbuffer),
+                            resource: ResourceTransitionBarrierResource::Texture(&backbuffer),
                             source_state: ResourceState::Present,
                             dest_state: ResourceState::RenderTargetWrite,
                         })],
@@ -447,7 +447,7 @@ impl Context {
                     self.device.cmd_resource_barrier(
                         cmd_list,
                         &[ResourceBarrier::Transition(ResourceTransitionBarrier {
-                            resource: ResourceTransitionBarrierResource::Texture(&*backbuffer),
+                            resource: ResourceTransitionBarrierResource::Texture(&backbuffer),
                             source_state: ResourceState::RenderTargetWrite,
                             dest_state: ResourceState::Present,
                         })],
@@ -1711,7 +1711,7 @@ unsafe extern "C" fn renderer_set_window_size(vp: *mut ImGuiViewport, size: ImVe
                     format: PixelFormat::R8G8B8A8Unorm,
                     sample_desc: SampleDesc::default(),
                     usage_flags: TextureUsageFlags::from_flag(TextureUsageFlagBits::RenderTarget),
-                    window_handle: (*platform_user_data).window.handle(),
+                    window_handle: platform_user_data.window.handle(),
                 },
                 Some(Arc::try_unwrap(old_swapchain.assume_init()).expect("Failed to unwrap arc!")),
             )

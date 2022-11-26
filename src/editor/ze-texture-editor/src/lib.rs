@@ -94,7 +94,7 @@ impl AssetEditor for Editor {
 
                 if let Some(default_srv) = texture.default_srv() {
                     imgui.image_centered(
-                        &default_srv,
+                        default_srv,
                         ImVec2::new(texture.width() as f32, texture.height() as f32),
                     );
                 }
