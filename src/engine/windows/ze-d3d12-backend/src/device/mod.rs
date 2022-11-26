@@ -630,7 +630,7 @@ impl Device for D3D12Device {
                         info.width,
                         info.height,
                         get_dxgi_format_from_ze_format(info.format),
-                        0,
+                        DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING.0 as u32,
                     )
                     .unwrap();
             };
@@ -684,7 +684,7 @@ impl Device for D3D12Device {
                 Scaling: DXGI_SCALING_STRETCH,
                 SwapEffect: DXGI_SWAP_EFFECT_FLIP_DISCARD,
                 AlphaMode: DXGI_ALPHA_MODE_UNSPECIFIED,
-                Flags: 0,
+                Flags: DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING.0 as u32,
             };
 
             let factory = self.dxgi_factory.lock();
@@ -922,6 +922,9 @@ impl Device for D3D12Device {
                 flags |= DXGI_PRESENT_RESTART;
                 swapchain.need_restart.store(false, Ordering::SeqCst);
             }
+
+            flags |= DXGI_PRESENT_ALLOW_TEARING;
+
             swapchain.swapchain.Present(0, flags).unwrap();
         }
     }

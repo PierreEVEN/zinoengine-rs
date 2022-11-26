@@ -1,4 +1,9 @@
 use enumflags2::{bitflags, BitFlags};
+use fnv::FnvHashMap;
+use once_cell::sync::Lazy;
+use parking_lot::RwLock;
+use std::alloc::Layout;
+use std::ffi::c_void;
 use std::ptr::NonNull;
 use std::{mem, ptr};
 use windows::core::{Vtable, HRESULT};
@@ -7,8 +12,8 @@ use windows::Win32::Graphics::Dxgi::*;
 use ze_d3dmemoryallocator_sys::{
     D3D12MA_Allocation, D3D12MA_Allocation_ReleaseThis, D3D12MA_Allocator,
     D3D12MA_Allocator_CreatePool, D3D12MA_Allocator_CreateResource, D3D12MA_Allocator_ReleaseThis,
-    D3D12MA_CreateAllocator, D3D12MA_Pool, D3D12MA_Pool_ReleaseThis, D3D12MA_ALLOCATION_DESC,
-    D3D12MA_ALLOCATION_FLAGS_ALLOCATION_FLAG_CAN_ALIAS,
+    D3D12MA_CreateAllocator, D3D12MA_Pool, D3D12MA_Pool_ReleaseThis, D3D12MA_ALLOCATION_CALLBACKS,
+    D3D12MA_ALLOCATION_DESC, D3D12MA_ALLOCATION_FLAGS_ALLOCATION_FLAG_CAN_ALIAS,
     D3D12MA_ALLOCATION_FLAGS_ALLOCATION_FLAG_COMMITTED,
     D3D12MA_ALLOCATION_FLAGS_ALLOCATION_FLAG_NEVER_ALLOCATE,
     D3D12MA_ALLOCATION_FLAGS_ALLOCATION_FLAG_STRATEGY_MIN_MEMORY,
@@ -68,16 +73,42 @@ pub struct PoolDesc {
     pub heap_flags: D3D12_HEAP_FLAGS,
 }
 
+static MEMORY_LAYOUT_MAP: Lazy<RwLock<FnvHashMap<usize, Layout>>> =
+    Lazy::new(|| RwLock::new(FnvHashMap::default()));
+
+unsafe extern "C" fn d3d12ma_allocate_rust(
+    size: usize,
+    alignment: usize,
+    _: *mut c_void,
+) -> *mut c_void {
+    let layout = Layout::from_size_align_unchecked(size, alignment);
+    let ptr = std::alloc::alloc(layout) as *mut _;
+    MEMORY_LAYOUT_MAP.write().insert(ptr as usize, layout);
+    ptr
+}
+
+unsafe extern "C" fn d3d12ma_free_rust(ptr: *mut c_void, _: *mut c_void) {
+    if ptr != ptr::null_mut() {
+        std::alloc::dealloc(ptr as *mut _, MEMORY_LAYOUT_MAP.read()[&(ptr as usize)]);
+    }
+}
+
 impl Allocator {
     pub fn new(desc: AllocatorDesc) -> Result<Allocator, HRESULT> {
         let mut allocator = ptr::null_mut();
+
+        let allocation_callbacks = D3D12MA_ALLOCATION_CALLBACKS {
+            pAllocate: Some(d3d12ma_allocate_rust),
+            pFree: Some(d3d12ma_free_rust),
+            pPrivateData: ptr::null_mut(),
+        };
 
         let result = unsafe {
             let d3d_desc = D3D12MA_ALLOCATOR_DESC {
                 Flags: 0,
                 pDevice: desc.device.as_raw() as *mut _,
                 PreferredBlockSize: 0,
-                pAllocationCallbacks: ptr::null_mut(),
+                pAllocationCallbacks: &allocation_callbacks,
                 pAdapter: desc.adapter.as_raw() as *mut _,
             };
 

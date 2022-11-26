@@ -1,6 +1,6 @@
 ﻿use crate::thread::thread_name;
 use chrono::Local;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use std::fmt::Arguments;
 use std::io::Write;
@@ -62,9 +62,7 @@ impl SinkEntry {
     }
 }
 
-lazy_static! {
-    static ref SINKS: RwLock<Vec<SinkEntry>> = Default::default();
-}
+static SINKS: Lazy<RwLock<Vec<SinkEntry>>> = Lazy::new(RwLock::default);
 
 #[doc(hidden)]
 pub fn internal_log(severity: Severity, crate_name: &str, args: Arguments) {

@@ -1,6 +1,7 @@
 ﻿use crate::component::{ComponentId, ComponentInfo, ComponentRegistry};
 use crate::entity::Entity;
 use crate::sparse_set::{SparseSet, TypeErasedSparseSet};
+use fnv::FnvHashMap;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::ptr::NonNull;
@@ -44,7 +45,7 @@ pub struct Archetype {
     components: Vec<ComponentId>,
     component_archetype_ids: Vec<ComponentArchetypeId>,
     columns: SparseSet<UnsafeCell<Column>>,
-    archetype_component_edges: HashMap<ComponentId, ArchetypeRelationEdge>,
+    archetype_component_edges: FnvHashMap<ComponentId, ArchetypeRelationEdge>,
     entities: Vec<Entity>,
 }
 

@@ -1,7 +1,6 @@
 ﻿use crate::utils::SendableIUnknown;
 use parking_lot::Mutex;
 use windows::Win32::Graphics::Direct3D12::ID3D12Resource;
-use ze_core::ze_info;
 use ze_d3dmemoryallocator::Allocation;
 
 pub enum Entry {

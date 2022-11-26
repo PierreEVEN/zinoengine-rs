@@ -1,13 +1,11 @@
-﻿use lazy_static::lazy_static;
+﻿use fnv::FnvHashMap;
+use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread::ThreadId;
 
-lazy_static! {
-    static ref THREAD_NAME_MAP: RwLock<HashMap<ThreadId, Arc<String>>> =
-        RwLock::new(HashMap::new());
-}
+static THREAD_NAME_MAP: Lazy<RwLock<FnvHashMap<ThreadId, Arc<String>>>> =
+    Lazy::new(RwLock::default);
 
 pub fn set_thread_name(id: ThreadId, name: String) {
     THREAD_NAME_MAP.write().insert(id, Arc::new(name));

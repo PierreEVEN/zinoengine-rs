@@ -1,14 +1,12 @@
-use lazy_static::lazy_static;
 use num_traits::FromPrimitive;
+use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 pub use std::sync::Arc;
 pub use ze_reflection_derive::*;
 
-lazy_static! {
-    static ref INTERNAL_TYPE_DATABASE: RwLock<HashMap<&'static str, Arc<TypeDescription>>> =
-        Default::default();
-}
+static INTERNAL_TYPE_DATABASE: Lazy<RwLock<HashMap<&'static str, Arc<TypeDescription>>>> =
+    Lazy::new(Default::default);
 
 pub struct MetaAttribute {
     name: String,
