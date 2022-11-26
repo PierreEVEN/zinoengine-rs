@@ -33,7 +33,7 @@ impl Frame {
         self.command_manager.wait_for_work();
     }
 
-    pub fn resource_manager(&self) -> &DeferredResourceQueue {
+    pub fn resource_queue(&self) -> &DeferredResourceQueue {
         &self.resource_manager
     }
 
@@ -82,8 +82,7 @@ impl FrameManager {
             .unwrap();
 
         self.current_frame().command_manager().new_frame();
-
-        self.current_frame().resource_manager().flush();
+        self.current_frame().resource_queue().flush();
     }
 
     pub fn wait_for_work(&self) {

@@ -45,18 +45,18 @@ use ze_gfx::backend::*;
 use ze_gfx::ShaderStageFlagBits;
 
 pub(crate) struct D3D12Device {
-    dxgi_factory: Arc<Mutex<SendableIUnknown<IDXGIFactory4>>>,
-    device: SendableIUnknown<ID3D12Device2>,
+    descriptor_manager: Arc<DescriptorManager>,
+    default_root_signature: SendableIUnknown<ID3D12RootSignature>,
+    pipeline_manager: PipelineManager,
     graphics_queue: SendableIUnknown<ID3D12CommandQueue>,
     _compute_queue: SendableIUnknown<ID3D12CommandQueue>,
     _transfer_queue: SendableIUnknown<ID3D12CommandQueue>,
-    frame_manager: Arc<FrameManager>,
-    descriptor_manager: Arc<DescriptorManager>,
-    pipeline_manager: PipelineManager,
-    default_root_signature: SendableIUnknown<ID3D12RootSignature>,
     frame_index: AtomicU64,
+    frame_manager: Arc<FrameManager>,
     transient_memory_pool: MemoryPool,
-    allocator: Arc<Allocator>,
+    allocator: Box<Allocator>,
+    device: SendableIUnknown<ID3D12Device2>,
+    dxgi_factory: Arc<Mutex<SendableIUnknown<IDXGIFactory4>>>,
 }
 
 impl D3D12Device {
@@ -105,7 +105,7 @@ impl D3D12Device {
         set_resource_name(&compute_queue.clone().into(), "Compute Queue");
         set_resource_name(&transfer_queue.clone().into(), "Transfer Queue");
 
-        let allocator = Arc::new(
+        let allocator = Box::new(
             Allocator::new(AllocatorDesc {
                 device: &*device,
                 adapter: (&adapter).into(),
@@ -224,6 +224,7 @@ impl D3D12Device {
 impl Drop for D3D12Device {
     fn drop(&mut self) {
         self.wait_idle();
+        assert_eq!(Arc::strong_count(&self.frame_manager), 1);
     }
 }
 
@@ -608,7 +609,7 @@ impl Device for D3D12Device {
         info: &SwapChainDesc,
         old_swapchain: Option<SwapChain>,
     ) -> Result<SwapChain, DeviceError> {
-        let swapchain_buffer_count = std::cmp::max(2, self.frame_manager.frame_count());
+        let swapchain_buffer_count = self.frame_manager.frame_count().max(2);
 
         if let Some(old_swapchain) = old_swapchain {
             let swapchain = old_swapchain
@@ -620,10 +621,7 @@ impl Device for D3D12Device {
 
             drop(old_swapchain);
 
-            self.frame_manager
-                .current_frame()
-                .resource_manager()
-                .flush();
+            self.frame_manager.current_frame().resource_queue().flush();
 
             unsafe {
                 swapchain
@@ -1545,6 +1543,8 @@ impl Device for D3D12Device {
                 .downcast_mut::<D3D12CommandList>()
                 .unwrap_unchecked()
         };
+
+        debug_assert!(data.len() <= 32 * 4);
 
         unsafe {
             cmd_list.cmd_list.SetGraphicsRoot32BitConstants(

@@ -12,6 +12,17 @@ pub enum SwapChainType {
     Unowned,
 }
 
+impl Drop for SwapChainType {
+    fn drop(&mut self) {
+        match self {
+            SwapChainType::Owned((swapchain, _)) => unsafe {
+                swapchain.assume_init_drop();
+            },
+            SwapChainType::Unowned => {}
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct ViewportRendererData {
     pub swapchain: SwapChainType,

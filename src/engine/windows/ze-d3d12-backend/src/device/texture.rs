@@ -29,13 +29,13 @@ impl Drop for D3D12Texture {
     fn drop(&mut self) {
         self.frame_manager
             .current_frame()
-            .resource_manager()
+            .resource_queue()
             .push(Entry::Resource(self.texture.clone()));
 
         if let Some(allocation) = self.allocation.take() {
             self.frame_manager
                 .current_frame()
-                .resource_manager()
+                .resource_queue()
                 .push(Entry::Allocation(allocation));
         }
     }

@@ -536,14 +536,14 @@ pub trait Device: Send + Sync {
 }
 
 // Resources
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum MemoryLocation {
     CpuToGpu,
     GpuOnly,
 }
 
 #[bitflags]
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 #[repr(u32)]
 pub enum MemoryFlagBits {
     /// Allow memory to be aliased with another resource
@@ -552,7 +552,7 @@ pub enum MemoryFlagBits {
 }
 pub type MemoryFlags = BitFlags<MemoryFlagBits>;
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct MemoryDesc {
     pub memory_location: MemoryLocation,
     pub memory_flags: MemoryFlags,
@@ -601,7 +601,7 @@ pub enum TextureUsageFlagBits {
 }
 pub type TextureUsageFlags = BitFlags<TextureUsageFlagBits>;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct TextureDesc {
     pub width: u32,
     pub height: u32,
